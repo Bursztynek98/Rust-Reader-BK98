@@ -31,6 +31,8 @@ const state = {
     sharpen:    0,
     threshold:  "none",
     clahe:      false,
+    num_step:   16,
+    speed:      1.6,
   },
   isCapturing: false,
   audioQueue:  [],
@@ -646,6 +648,14 @@ bindSlider(slContrast,   outContrast,   "contrast",   v => (v/100).toFixed(1) + 
 bindSlider(slBlur,       outBlur,       "blur",       v => v);
 bindSlider(slSharpen,    outSharpen,    "sharpen",    v => v);
 
+const slNumStep   = $("sl-num-step");
+const slSpeed     = $("sl-speed");
+const outNumStep  = $("out-num-step");
+const outSpeed    = $("out-speed");
+
+if (slNumStep && outNumStep) bindSlider(slNumStep, outNumStep, "num_step", v => v);
+if (slSpeed && outSpeed)     bindSlider(slSpeed,   outSpeed,   "speed",    v => parseFloat(v).toFixed(1) + "×");
+
 const btnClahe = $("btn-toggle-clahe");
 if (btnClahe) {
   btnClahe.addEventListener("click", () => {
@@ -763,7 +773,11 @@ ttsTestBtn.addEventListener("click", async () => {
     const res  = await fetch("/tts-test", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ text }),
+      body:    JSON.stringify({
+        text,
+        num_step: state.settings.num_step,
+        speed: state.settings.speed,
+      }),
     });
     const data = await res.json();
 

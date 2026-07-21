@@ -160,12 +160,14 @@ async def tts_test(payload: dict):
     if tts_worker.ref_audio_path is None:
         return JSONResponse({"error": "Brak wybranego głosu – wczytaj plik MP3/WAV"}, status_code=400)
 
+    num_step = int(payload.get("num_step", 16))
+    speed = float(payload.get("speed", 1.0))
     loop = asyncio.get_event_loop()
     audio_filename = f"test_{uuid.uuid4().hex[:8]}.wav"
     audio_path = AUDIO_DIR / audio_filename
 
     success = await loop.run_in_executor(
-        None, tts_worker.generate_sync, text, str(audio_path)
+        None, tts_worker.generate_sync, text, str(audio_path), num_step, speed
     )
 
     if not success:
@@ -232,9 +234,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     audio_filename = f"{uuid.uuid4().hex}.wav"
                     audio_path = AUDIO_DIR / audio_filename
 
-                    async def _gen(txt=text, path=audio_path, fname=audio_filename):
+                    num_step = int(settings.get("num_step", 16))
+                    speed = float(settings.get("speed", 1.0))
+
+                    async def _gen(txt=text, path=audio_path, fname=audio_filename, n_step=num_step, spd=speed):
                         success = await loop.run_in_executor(
-                            None, tts_worker.generate_sync, txt, str(path)
+                            None, tts_worker.generate_sync, txt, str(path), n_step, spd
                         )
                         if success:
                             await push({

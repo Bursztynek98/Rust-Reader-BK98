@@ -111,7 +111,13 @@ class TTSWorker:
             return path
 
     # ──────────────────────────────────────────────────────────────────────
-    def generate_sync(self, text: str, output_path: str) -> bool:
+    def generate_sync(
+        self,
+        text: str,
+        output_path: str,
+        num_step: int = 16,
+        speed: float = 1.0,
+    ) -> bool:
         """
         Generuje audio dla tekstu. Używa zapamiętanego w VRAM promptu głosu.
         """
@@ -122,9 +128,6 @@ class TTSWorker:
         if self.ref_audio_path is None:
             print("[TTS] Brak głosu referencyjnego – wgraj najpierw plik audio.")
             return False
-        
-        if self.cached_prompt is None:
-            print("[TTS] Brak zapamiętanego promptu głosu – wgraj najpierw plik audio.")
 
         with self._gpu_lock:
             try:
@@ -133,15 +136,15 @@ class TTSWorker:
                     result = self.model.generate(
                         text=text,
                         voice_clone_prompt=self.cached_prompt,
-                        num_step=16,  # diffusion steps (or 16 for faster inference)
-                        speed=1.6,     # speed factor (>1.0 faster, <1.0 slower)
+                        num_step=int(num_step),  # diffusion steps (or 16 for faster inference)
+                        speed=float(speed),     # speed factor (>1.0 faster, <1.0 slower)
                     )
                 else:
                     result = self.model.generate(
                         text=text,
                         ref_audio=self.ref_audio_path,
-                        num_step=16,  # diffusion steps (or 16 for faster inference)
-                        speed=1.6,     # speed factor (>1.0 faster, <1.0 slower)
+                        num_step=int(num_step),  # diffusion steps (or 16 for faster inference)
+                        speed=float(speed),     # speed factor (>1.0 faster, <1.0 slower)
                     )
 
                 if isinstance(result, tuple):
