@@ -14,14 +14,24 @@ class OCRWorker:
     """PaddleOCR singleton z zoptymalizowanym preprocesorem dla napisów filmowych."""
 
     def __init__(self):
-        # Wyłączamy use_angle_cls dla znacznego przyspieszenia detekcji napisów
+        # Wyłączamy use_angle_cls dla przyspieszenia, dodajemy optymalizację pod napisy
         self.ocr = PaddleOCR(
             use_gpu=True,
             lang="pl",
             use_angle_cls=False,
             show_log=False,
+            det_db_box_thresh=0.35,       # Wykrywa drobniejsze/cieńsze czcionki
+            det_db_unclip_ratio=2.0,      # Poszerza margines ramek detekcji (polskie znaki ś, ż, ą)
+            rec_image_shape="3, 48, 640", # Szeroki bufor rozpoznawania dla długich zdań
         )
-        print("[OCR] PaddleOCR initialized on GPU (fast mode).")
+        print("[OCR] PaddleOCR initialized on GPU (subtitle-optimized mode).")
+
+    @staticmethod
+    def _add_padding(img: np.ndarray, pad: int = 25) -> np.ndarray:
+        """Dodaje czarną ramkę wokół kadru, aby litery przy krawędziach nie były obcinane przez DBNet."""
+        return cv2.copyMakeBorder(
+            img, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=[0, 0, 0]
+        )
 
     @staticmethod
     def _smart_resize(img: np.ndarray, target_height: int = 140) -> np.ndarray:
@@ -89,7 +99,7 @@ class OCRWorker:
                 )
             img_out = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
 
-        return self._smart_resize(img_out)
+        return self._add_padding(self._smart_resize(img_out))
 
     def process(
         self,
