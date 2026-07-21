@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  subvoice:
+    build: .
+    container_name: subvoice
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./voices:/app/voices
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./audio_cache:/app/audio_cache
+      - paddle_models:/root/.paddleocr
+      - omnivoice_cache:/root/.cache/huggingface
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    shm_size: '16gb'
+    # restart: unless-stopped
+
+volumes:
+  paddle_models:
+    driver: local
+  omnivoice_cache:
+    driver: local

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SubVoice – Real-time Subtitle Audio</title>
+  <meta name="description" content="Real-time OCR subtitle to AI voice converter running on GPU" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- ── HEADER ─────────────────────────────────────────────────── -->
+    <header class="header">
+      <div class="header-brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none">
+            <rect x="2" y="8" width="28" height="16" rx="3" stroke="url(#g1)" stroke-width="2.5"/>
+            <path d="M8 14h16M8 18h10" stroke="url(#g1)" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="26" cy="10" r="4" fill="url(#g2)"/>
+            <path d="M24.5 10l1 1 2-2" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#818cf8"/>
+                <stop offset="1" stop-color="#38bdf8"/>
+              </linearGradient>
+              <linearGradient id="g2" x1="22" y1="6" x2="30" y2="14" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#34d399"/>
+                <stop offset="1" stop-color="#059669"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-name">SubVoice</h1>
+          <p class="brand-tagline">Real-time OCR → AI Voice</p>
+        </div>
+      </div>
+
+      <div class="header-status">
+        <div class="status-chip" id="status-chip">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-label">Łączenie…</span>
+        </div>
+        <div class="gpu-chip" id="gpu-chip">
+          <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 5V3M8 5V3M12 5V3M15 5V3M5 17v-2M8 17v-2M12 17v-2M15 17v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="5" y="7.5" width="10" height="5" rx="1" fill="currentColor" opacity="0.25"/></svg>
+          <span id="gpu-label">GPU …</span>
+        </div>
+        <div class="voice-chip" id="voice-chip">
+          <svg viewBox="0 0 20 20" fill="none"><path d="M10 13a3 3 0 003-3V6a3 3 0 00-6 0v4a3 3 0 003 3z" stroke="currentColor" stroke-width="1.5"/><path d="M5 10a5 5 0 0010 0M10 15v2M7 17h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span id="voice-label">Brak głosu</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── MAIN ───────────────────────────────────────────────────── -->
+    <main class="main">
+
+      <!-- ── LEFT: SCREEN CAPTURE ──────────────────────────────── -->
+      <section class="panel panel-left" aria-label="Przechwytywanie ekranu">
+        <div class="panel-hd">
+          <span class="panel-title">
+            <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="11" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M7 17h6M10 14v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Ekran
+          </span>
+          <div class="hd-actions">
+            <button class="btn btn-primary" id="btn-share">
+              <svg viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="10" height="8" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M11 5.5l3-2v7l-3-2" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+              Udostępnij ekran
+            </button>
+            <button class="btn btn-danger" id="btn-stop" disabled>
+              <svg viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1" fill="currentColor"/></svg>
+              Stop
+            </button>
+          </div>
+        </div>
+
+        <div class="canvas-area" id="canvas-area">
+          <canvas id="screen-canvas" class="screen-canvas"></canvas>
+          <canvas id="roi-canvas"    class="roi-canvas"></canvas>
+          <div class="canvas-empty" id="canvas-empty">
+            <svg viewBox="0 0 64 64" fill="none" class="empty-icon">
+              <rect x="4" y="8" width="56" height="38" rx="4" stroke="currentColor" stroke-width="2.5" stroke-dasharray="6 4"/>
+              <path d="M24 50h16M32 46v4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              <circle cx="32" cy="27" r="10" stroke="currentColor" stroke-width="2" stroke-dasharray="5 3"/>
+              <path d="M29 27l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <p>Kliknij <strong>Udostępnij ekran</strong></p>
+            <p class="empty-hint">Następnie narysuj region z napisami</p>
+          </div>
+        </div>
+
+        <div class="roi-bar">
+          <svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="5" height="5" rx="0.5" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="1" width="5" height="5" rx="0.5" stroke="currentColor" stroke-width="1.5"/><rect x="1" y="10" width="5" height="5" rx="0.5" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="10" width="5" height="5" rx="0.5" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span id="roi-label">Przeciągnij myszą by zaznaczyć region OCR</span>
+          <button class="btn-link" id="btn-clear-roi">Wyczyść</button>
+        </div>
+      </section>
+
+      <!-- ── MIDDLE: SETTINGS ───────────────────────────────────── -->
+      <section class="panel panel-mid" aria-label="Ustawienia obrazu">
+        <div class="panel-hd">
+          <span class="panel-title">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M8 2v2M8 16v2M2 8h2M16 8h2M4.22 4.22l1.41 1.41M14.37 14.37l1.41 1.41M4.22 11.78l1.41-1.41M14.37 5.63l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/></svg>
+            Korekcja OCR
+          </span>
+        </div>
+
+        <!-- OCR crop preview -->
+        <div class="preview-box">
+          <div class="preview-label">Podgląd regionu (po korekcji)</div>
+          <div class="preview-img-wrap" id="preview-wrap">
+            <img id="ocr-preview" alt="Podgląd OCR" />
+            <div class="preview-empty" id="preview-empty">Brak zaznaczenia</div>
+          </div>
+        </div>
+
+        <!-- Sliders -->
+        <div class="sliders">
+          <div class="slider-row">
+            <div class="slider-meta">
+              <label for="sl-brightness">☀ Jasność</label>
+              <output id="out-brightness">0</output>
+            </div>
+            <input type="range" id="sl-brightness" class="sl" min="-100" max="100" value="0" step="1" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-meta">
+              <label for="sl-contrast">◑ Kontrast</label>
+              <output id="out-contrast">1.0×</output>
+            </div>
+            <input type="range" id="sl-contrast" class="sl" min="50" max="300" value="100" step="5" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-meta">
+              <label for="sl-blur">∿ Rozmycie</label>
+              <output id="out-blur">0</output>
+            </div>
+            <input type="range" id="sl-blur" class="sl" min="0" max="5" value="0" step="1" />
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-meta">
+              <label for="sl-sharpen">✦ Wyostrzenie</label>
+              <output id="out-sharpen">0</output>
+            </div>
+            <input type="range" id="sl-sharpen" class="sl" min="0" max="10" value="0" step="1" />
+          </div>
+
+          <div class="slider-row threshold-row">
+            <div class="slider-meta">
+              <label>⬛ Binaryzacja</label>
+            </div>
+            <div class="seg-ctrl" id="seg-threshold" role="group" aria-label="Tryb binaryzacji">
+              <button class="seg-btn active" data-val="none">Brak</button>
+              <button class="seg-btn" data-val="otsu">Otsu</button>
+              <button class="seg-btn" data-val="adaptive">Adaptywna</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Voice upload -->
+        <div class="voice-card">
+          <div class="voice-card-hd">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M10 13a3 3 0 003-3V6a3 3 0 00-6 0v4a3 3 0 003 3z" stroke="currentColor" stroke-width="1.5"/><path d="M5 10a5 5 0 0010 0M10 15v2M7 17h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span>Model głosu</span>
+          </div>
+          <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="Wczytaj plik głosu">
+            <input type="file" id="voice-input" accept=".mp3,.wav,.ogg,.flac,.m4a" hidden />
+            <svg viewBox="0 0 24 24" fill="none" class="drop-icon"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="drop-label">MP3 / WAV / OGG / FLAC</span>
+            <span class="drop-hint">Kliknij lub przeciągnij plik</span>
+          </div>
+
+          <!-- Pliki z folderu /voices/ -->
+          <div class="voice-folder-label">Pliki w folderze <code>/voices/</code></div>
+          <div class="voice-list" id="voice-list"></div>
+
+          <div class="voice-feedback" id="voice-feedback"></div>
+        </div>
+
+        <!-- TTS TEST CARD -->
+        <div class="tts-test-card">
+          <div class="tts-test-hd">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm0 0v16M2 10h16" stroke="none"/><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M7 7l6 3-6 3V7z" fill="currentColor"/></svg>
+            <span>Test głosu (wpisz tekst)</span>
+          </div>
+          <textarea
+            id="tts-test-input"
+            class="tts-textarea"
+            placeholder="Wpisz tekst do przeczytania…"
+            rows="3"
+            maxlength="500"
+          ></textarea>
+          <div class="tts-test-footer">
+            <span class="tts-char-count"><span id="tts-char-cur">0</span>/500</span>
+            <button class="btn btn-primary" id="btn-tts-test" disabled>
+              <svg viewBox="0 0 16 16" fill="none"><path d="M4 3l9 5-9 5V3z" fill="currentColor"/></svg>
+              Generuj i odtwórz
+            </button>
+          </div>
+          <div class="tts-test-status" id="tts-test-status"></div>
+        </div>
+
+      </section>
+
+      <!-- ── RIGHT: AUDIO + SUBTITLES ───────────────────────────── -->
+      <section class="panel panel-right" aria-label="Odtwarzacz i napisy">
+        <div class="panel-hd">
+          <span class="panel-title">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M3 15V7a7 7 0 0114 0v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="1" y="12" width="4" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="15" y="12" width="4" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+            Audio & Napisy
+          </span>
+          <div class="conf-pill">
+            <span class="conf-label">OCR</span>
+            <div class="conf-bar-track"><div class="conf-bar-fill" id="conf-fill"></div></div>
+            <span id="conf-val">0%</span>
+          </div>
+        </div>
+
+        <!-- Current subtitle -->
+        <div class="subtitle-card" id="subtitle-card">
+          <div class="subtitle-eyebrow">Rozpoznany tekst</div>
+          <div class="subtitle-body" id="subtitle-body">
+            <span class="subtitle-ph">Oczekiwanie na napisy…</span>
+          </div>
+        </div>
+
+        <!-- Audio player -->
+        <div class="player-card">
+          <div class="player-hd">
+            <span>Odtwarzacz</span>
+            <div class="player-badges">
+              <span class="badge badge-status" id="badge-status">Gotowy</span>
+              <span class="badge badge-speed" id="badge-speed" hidden>⚡ ×3</span>
+            </div>
+          </div>
+
+          <!-- Animated waveform -->
+          <div class="waveform" id="waveform" aria-hidden="true">
+            <div class="waveform-bars" id="waveform-bars"></div>
+          </div>
+
+          <!-- Progress -->
+          <div class="progress-track" id="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+          <div class="progress-times">
+            <span id="time-cur">0:00</span>
+            <span id="time-tot">0:00</span>
+          </div>
+
+          <audio id="audio-el" preload="auto"></audio>
+
+          <!-- Queue indicator -->
+          <div class="queue-row" id="queue-row">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h10M2 12h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span id="queue-label">Kolejka: pusta</span>
+          </div>
+        </div>
+
+        <!-- History -->
+        <div class="history-card">
+          <div class="history-hd">
+            <span>Historia napisów</span>
+            <button class="btn-link" id="btn-clear-hist">Wyczyść</button>
+          </div>
+          <div class="history-scroll" id="history-scroll">
+            <div class="history-empty">Historia jest pusta</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  <!-- Debug bar -->
+  <div class="debug-bar">
+    <span class="dbg-label">DBG:</span>
+    <span id="dbg-text">–</span>
+  </div>
+
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
