@@ -39,7 +39,7 @@ WORKDIR /app
 
 # ── PaddlePaddle GPU (CUDA 13.0) ─────────────────────────
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install paddlepaddle-gpu \
+    pip3 install paddlepaddle-gpu==3.3.1 \
     -i https://www.paddlepaddle.org.cn/packages/stable/cu130/
 
 # ── PyTorch GPU (CUDA 13.0) ───────────────────────────────
@@ -59,16 +59,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install --no-deps omnivoice
 
 # ── Sanity check – printed during build ───────────────────
-RUN python3 -c " \
-import sys, torch, transformers; \
-print('=== Build verification ==='); \
-print(f'Python:       {sys.version}'); \
-print(f'torch:        {torch.__version__}'); \
-print(f'CUDA runtime: {torch.version.cuda}'); \
-print(f'transformers: {transformers.__version__}'); \
-print(f'sys.get_int_max_str_digits: {sys.get_int_max_str_digits()}'); \
-print('========================='); \
-"
+RUN python3 -c "import sys, torch, transformers; print('=== Build verification ==='); print(f'Python: {sys.version}'); print(f'torch: {torch.__version__}'); print(f'CUDA runtime: {torch.version.cuda}'); print(f'transformers: {transformers.__version__}'); print('=========================');"
 
 # ── Copy application ──────────────────────────────────────
 COPY backend/ ./backend/

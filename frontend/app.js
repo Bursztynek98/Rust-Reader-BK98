@@ -13,7 +13,7 @@
    CONSTANTS & STATE
    ════════════════════════════════════════════════════ */
 const WS_URL          = `ws://${location.host}/ws`;
-const OCR_INTERVAL_MS = 1000;
+const OCR_INTERVAL_MS = 500;
 const SPEEDUP_RATE    = 3.0;
 const SPEEDUP_THRESH  = 2.0;
 
@@ -30,6 +30,7 @@ const state = {
     blur:       0,
     sharpen:    0,
     threshold:  "none",
+    clahe:      false,
   },
   isCapturing: false,
   audioQueue:  [],
@@ -644,6 +645,15 @@ bindSlider(slBrightness, outBrightness, "brightness", v => (+v > 0 ? "+" : "") +
 bindSlider(slContrast,   outContrast,   "contrast",   v => (v/100).toFixed(1) + "×");
 bindSlider(slBlur,       outBlur,       "blur",       v => v);
 bindSlider(slSharpen,    outSharpen,    "sharpen",    v => v);
+
+const btnClahe = $("btn-toggle-clahe");
+if (btnClahe) {
+  btnClahe.addEventListener("click", () => {
+    state.settings.clahe = !state.settings.clahe;
+    btnClahe.classList.toggle("active", state.settings.clahe);
+    btnClahe.textContent = state.settings.clahe ? "Włączony" : "Wyłączony";
+  });
+}
 
 segThreshold.querySelectorAll(".seg-btn").forEach(btn => {
   btn.addEventListener("click", () => {
