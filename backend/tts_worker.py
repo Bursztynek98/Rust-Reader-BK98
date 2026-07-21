@@ -133,15 +133,15 @@ class TTSWorker:
                     result = self.model.generate(
                         text=text,
                         voice_clone_prompt=self.cached_prompt,
-                        num_step=25,  # diffusion steps (or 16 for faster inference)
-                        speed=1.5,     # speed factor (>1.0 faster, <1.0 slower)
+                        num_step=16,  # diffusion steps (or 16 for faster inference)
+                        speed=1.6,     # speed factor (>1.0 faster, <1.0 slower)
                     )
                 else:
                     result = self.model.generate(
                         text=text,
                         ref_audio=self.ref_audio_path,
-                        num_step=25,  # diffusion steps (or 16 for faster inference)
-                        speed=1.5,     # speed factor (>1.0 faster, <1.0 slower)
+                        num_step=16,  # diffusion steps (or 16 for faster inference)
+                        speed=1.6,     # speed factor (>1.0 faster, <1.0 slower)
                     )
 
                 if isinstance(result, tuple):

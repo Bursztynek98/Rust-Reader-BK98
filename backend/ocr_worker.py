@@ -53,17 +53,17 @@ class OCRWorker:
         sharpen    = int(settings.get("sharpen", 0))              # 0..10
         threshold  = settings.get("threshold", "none")            # none|otsu|adaptive
 
-        # 1. Kontrast i Jasność (f(x) = α·x + β)
-        img_out = cv2.convertScaleAbs(img, alpha=contrast, beta=brightness)
-
-        # 2. CLAHE (Adaptacyjny kontrast dla napisów na zmiennym tle)
+        # 1. CLAHE (Adaptacyjny kontrast dla napisów na zmiennym tle - przed skalowaniem)
         if settings.get("clahe", False):
-            lab = cv2.cvtColor(img_out, cv2.COLOR_BGR2LAB)
+            lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
             l, a, b = cv2.split(lab)
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            clahe = cv2.createCLAHE(clipLimit=4.5, tileGridSize=(8, 8))
             cl = clahe.apply(l)
             limg = cv2.merge((cl, a, b))
-            img_out = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+            img = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+
+        # 2. Kontrast i Jasność (f(x) = α·x + β)
+        img_out = cv2.convertScaleAbs(img, alpha=contrast, beta=brightness)
 
         # 3. Odszumianie Gaussian Blur
         if blur > 0:

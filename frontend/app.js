@@ -652,6 +652,7 @@ if (btnClahe) {
     state.settings.clahe = !state.settings.clahe;
     btnClahe.classList.toggle("active", state.settings.clahe);
     btnClahe.textContent = state.settings.clahe ? "Włączony" : "Wyłączony";
+    dbg("CLAHE set to: " + state.settings.clahe);
   });
 }
 
