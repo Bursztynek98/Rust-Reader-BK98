@@ -96,12 +96,34 @@ const queueRow      = $("queue-row");
 const queueLabel    = $("queue-label");
 
 const audioEl       = $("audio-el");
+const slVolume      = $("sl-volume");
+const outVolume     = $("out-volume");
 
 const dropZone      = $("drop-zone");
 const voiceInput    = $("voice-input");
 const dropLabel     = $("drop-label");
 const voiceFeedback = $("voice-feedback");
 const voiceList     = $("voice-list");
+
+// Initialize volume from localStorage or default 100%
+(function initVolume() {
+  const savedVol = localStorage.getItem("subvoice_volume");
+  const vol = savedVol !== null ? parseInt(savedVol, 10) : 100;
+  if (slVolume && outVolume && audioEl) {
+    slVolume.value = vol;
+    outVolume.textContent = `${vol}%`;
+    audioEl.volume = vol / 100;
+  }
+})();
+
+if (slVolume && outVolume) {
+  slVolume.addEventListener("input", () => {
+    const vol = parseInt(slVolume.value, 10);
+    outVolume.textContent = `${vol}%`;
+    if (audioEl) audioEl.volume = vol / 100;
+    localStorage.setItem("subvoice_volume", vol);
+  });
+}
 
 const histScroll    = $("history-scroll");
 const dbgText       = $("dbg-text");

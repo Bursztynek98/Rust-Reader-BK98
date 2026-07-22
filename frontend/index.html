@@ -196,24 +196,7 @@
               <button class="seg-btn" data-val="otsu">Otsu</button>
               <button class="seg-btn" data-val="adaptive">Adaptywna</button>
             </div>
-          </div>
-
-          <div class="slider-row">
-            <div class="slider-meta">
-              <label for="sl-num-step">🎲 Kroki dyfuzji TTS (num_step)</label>
-              <output id="out-num-step">16</output>
-            </div>
-            <input type="range" id="sl-num-step" class="sl" min="4" max="32" value="16" step="1" />
-          </div>
-
-          <div class="slider-row">
-            <div class="slider-meta">
-              <label for="sl-speed">⚡ Prędkość głosu TTS (speed)</label>
-              <output id="out-speed">1.6×</output>
-            </div>
-            <input type="range" id="sl-speed" class="sl" min="0.5" max="2.5" value="1.6" step="0.1" />
-          </div>
-        </div>
+          </div>        </div>
 
         <!-- Voice upload -->
         <div class="voice-card">
@@ -312,6 +295,20 @@
           <div class="queue-row" id="queue-row">
             <svg viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h10M2 12h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span id="queue-label">Kolejka: pusta</span>
+          </div>
+
+          <!-- Volume control -->
+          <div class="volume-row">
+            <svg viewBox="0 0 20 20" fill="none" class="volume-icon" width="16" height="16"><path d="M9 5L5 9H2v2h3l4 4V5z" fill="currentColor"/><path d="M12.5 7.5a3.5 3.5 0 010 5M14.5 5.5a6.5 6.5 0 010 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input type="range" id="sl-volume" class="sl sl-vol" min="0" max="100" value="100" step="1" title="Głośność lektora" />
+            <output id="out-volume">100%</output>
+          </div>
+
+          <!-- Speed control -->
+          <div class="volume-row speed-row">
+            <svg viewBox="0 0 20 20" fill="none" class="volume-icon" width="16" height="16"><path d="M13 10V3L4 12h5v7l9-9h-5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <input type="range" id="sl-speed" class="sl sl-vol" min="0.5" max="2.5" value="1.6" step="0.1" title="Prędkość mowy TTS" />
+            <output id="out-speed">1.6×</output>
           </div>
         </div>
 
