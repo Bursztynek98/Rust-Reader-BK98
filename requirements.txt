@@ -11,15 +11,8 @@ opencv-python-headless==4.10.0.84
 numpy==1.26.4
 Pillow==10.4.0
 
-# HuggingFace stack
-# transformers latest (4.49+) required by OmniVoice for HiggsAudioV2TokenizerModel
-# Python 3.12 (Ubuntu 24.04) has sys.get_int_max_str_digits so torch._dynamo works fine
-transformers>=4.49.0
-accelerate>=0.30.0
-huggingface_hub>=0.22.0
-
-# TTS
-omnivoice
+# ONNX GPU execution for Piper TTS
+onnxruntime-gpu>=1.17.0
 
 # Audio processing
 pydub==0.25.1
@@ -27,5 +20,3 @@ soundfile==0.12.1
 
 # Text diff
 python-Levenshtein==0.26.1
-
-# NOTE: torch, torchaudio installed in Dockerfile from PyTorch cu130 wheel index

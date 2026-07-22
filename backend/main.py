@@ -96,15 +96,15 @@ async def health():
         "gpu_name": gpu_name,
         "ocr_ready": ocr_worker is not None,
         "tts_ready": tts_worker is not None and tts_worker.model is not None,
-        "voice_loaded": tts_worker.ref_audio_path if tts_worker else None,
-        "voice_filename": Path(tts_worker.ref_audio_path).name if (tts_worker and tts_worker.ref_audio_path) else None,
+        "voice_loaded": tts_worker.current_model_path if tts_worker else None,
+        "voice_filename": Path(tts_worker.current_model_path).name if (tts_worker and tts_worker.current_model_path) else None,
     }
 
 
 @app.get("/voices-list")
 async def list_voices():
-    """List all audio files available in /app/voices/ folder."""
-    allowed = {".mp3", ".wav", ".ogg", ".flac", ".m4a"}
+    """List all voice model (.onnx) and audio files in /app/voices/ folder."""
+    allowed = {".onnx", ".mp3", ".wav", ".ogg", ".flac", ".m4a"}
     files = [
         f.name for f in VOICES_DIR.iterdir()
         if f.suffix.lower() in allowed and f.is_file()
@@ -114,7 +114,7 @@ async def list_voices():
 
 @app.post("/select-voice")
 async def select_voice(payload: dict):
-    """Select an existing voice file from /app/voices/ by filename."""
+    """Select an existing voice model (.onnx) from /app/voices/ by filename."""
     filename = payload.get("filename", "")
     path = VOICES_DIR / filename
     if not path.exists():
@@ -125,14 +125,13 @@ async def select_voice(payload: dict):
 
 @app.post("/upload-voice")
 async def upload_voice(file: UploadFile = File(...)):
-
-    """Upload a new reference voice file (MP3/WAV/OGG/FLAC)."""
-    allowed_exts = {".mp3", ".wav", ".ogg", ".flac", ".m4a"}
+    """Upload a new Piper voice model (.onnx / .json) or audio file."""
+    allowed_exts = {".onnx", ".json", ".mp3", ".wav", ".ogg", ".flac", ".m4a"}
     ext = Path(file.filename).suffix.lower()
     if ext not in allowed_exts:
         return JSONResponse({"error": f"Unsupported format: {ext}"}, status_code=400)
 
-    dest = VOICES_DIR / f"reference{ext}"
+    dest = VOICES_DIR / file.filename
     async with aiofiles.open(dest, "wb") as f:
         content = await file.read()
         await f.write(content)
@@ -143,7 +142,7 @@ async def upload_voice(file: UploadFile = File(...)):
         "status": "ok",
         "filename": file.filename,
         "path": str(dest),
-        "voice_ready": tts_worker.ref_audio_path is not None,
+        "voice_ready": tts_worker.model is not None,
     }
 
 
@@ -157,8 +156,8 @@ async def tts_test(payload: dict):
         return JSONResponse({"error": "Tekst za długi (max 500 znaków)"}, status_code=400)
     if tts_worker is None or tts_worker.model is None:
         return JSONResponse({"error": "Model TTS nie jest załadowany"}, status_code=503)
-    if tts_worker.ref_audio_path is None:
-        return JSONResponse({"error": "Brak wybranego głosu – wczytaj plik MP3/WAV"}, status_code=400)
+    # if tts_worker.ref_audio_path is None:
+    #     return JSONResponse({"error": "Brak wybranego głosu – wczytaj plik MP3/WAV"}, status_code=400)
 
     num_step = int(payload.get("num_step", 16))
     speed = float(payload.get("speed", 1.0))

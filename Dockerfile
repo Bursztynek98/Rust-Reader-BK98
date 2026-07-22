@@ -5,12 +5,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV CUDA_VISIBLE_DEVICES=0
-# Ubuntu 24.04 uses PEP 668 "externally managed" python.
-# In Docker containers we own the whole system, so allow pip to install globally.
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # ── System dependencies ───────────────────────────────────
-# Note: Ubuntu 24.04 renames libgl1-mesa-glx → libgl1, libxrender-dev → libxrender1
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-dev \
@@ -23,15 +20,14 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     libgomp1 \
     libsndfile1 \
+    espeak-ng \
+    libespeak-ng-dev \
     curl \
     wget \
+    tar \
     && rm -rf /var/lib/apt/lists/*
 
-# Ubuntu 24.04 ships Python 3.12 as default python3
-RUN python3 --version
-
 # ── Pip upgrade ───────────────────────────────────────────
-# Ubuntu 24.04 installs pip via debian (no RECORD file) → use --ignore-installed
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install --upgrade pip setuptools wheel --ignore-installed
 
@@ -47,19 +43,17 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install torch torchaudio \
     --index-url https://download.pytorch.org/whl/cu130
 
-# ── App requirements (everything except omnivoice) ────────
+# ── App requirements ──────────────────────────────────────
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    grep -v '^omnivoice' requirements.txt > /tmp/req_no_omni.txt && \
-    pip3 install -r /tmp/req_no_omni.txt
+    pip3 install -r requirements.txt
 
-# ── OmniVoice – installed WITHOUT deps ────────────────────
-# Prevents pip from pulling CPU-torch or wrong transformers version
+# ── Piper TTS Python API ──────────────────────────────────
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install --no-deps omnivoice
+    pip3 install piper-tts --no-deps
 
 # ── Sanity check – printed during build ───────────────────
-RUN python3 -c "import sys, torch, transformers; print('=== Build verification ==='); print(f'Python: {sys.version}'); print(f'torch: {torch.__version__}'); print(f'CUDA runtime: {torch.version.cuda}'); print(f'transformers: {transformers.__version__}'); print('=========================');"
+RUN python3 -c "import sys, piper; print('=== Build verification ==='); print(f'Python: {sys.version}'); print('PiperVoice API ready'); print('=========================');"
 
 # ── Copy application ──────────────────────────────────────
 COPY backend/ ./backend/
