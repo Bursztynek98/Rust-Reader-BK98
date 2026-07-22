@@ -31,11 +31,9 @@ const state = {
     sharpen:       0,
     threshold:     "none",
     clahe:         false,
-    max_channel:   false,
-    erode:         false,
-    skip_ocr:         false,
-    gemma_correction: false,
-    speed:            1.6,
+    skip_ocr:  false,
+    vision_ai: false,
+    speed:     1.6,
   },
   isCapturing: false,
   audioQueue:  [],
@@ -550,7 +548,7 @@ btnClearRoi.addEventListener("click", clearRoi);
    OCR RESULT HANDLER
    ════════════════════════════════════════════════════ */
 function updateOcrResult(msg) {
-  const { raw_text, text, confidence, preview, changed, gemma_corrected } = msg;
+  const { raw_text, text, confidence, preview, changed, vision_corrected } = msg;
 
   // Confidence bar
   confFill.style.width = (confidence || 0) + "%";
@@ -568,7 +566,7 @@ function updateOcrResult(msg) {
         subtitleBody.classList.add("flash");
         subtitleCard.classList.add("active");
         setTimeout(() => subtitleCard.classList.remove("active"), 2000);
-        addHistory(finalDisplay, rawDisplay, gemma_corrected);
+        addHistory(finalDisplay, rawDisplay, vision_corrected);
         dbg(`TTS triggered: "${finalDisplay.slice(0, 50)}"`);
       }
       subtitleBody.textContent = finalDisplay;
@@ -582,6 +580,22 @@ function updateOcrResult(msg) {
     ocrPreview.src           = "data:image/jpeg;base64," + preview;
     ocrPreview.style.display = "block";
     if (previewEmpty) previewEmpty.style.display = "none";
+
+    const prevMeta  = $("preview-meta");
+    const prevBadge = $("preview-badge");
+
+    ocrPreview.onload = () => {
+      if (prevMeta)  prevMeta.textContent = `Wymiary wycinka: ${ocrPreview.naturalWidth}×${ocrPreview.naturalHeight}px`;
+      if (prevBadge) {
+        if (state.settings.vision_ai) {
+          prevBadge.textContent = "● Wysyłany do Vision AI";
+          prevBadge.className   = "preview-badge active";
+        } else {
+          prevBadge.textContent = "Piksele z ROI";
+          prevBadge.className   = "preview-badge";
+        }
+      }
+    };
   }
 
   dbg(`OCR: conf=${(confidence||0).toFixed(0)}% changed=${changed} text="${(text||'').slice(0,40)}"`);
@@ -702,7 +716,7 @@ bindToggle("btn-toggle-maxchannel",   "max_channel",   "Max-Channel");
 bindToggle("btn-toggle-erode",        "erode",         "Erozja");
 bindToggle("btn-toggle-filterheight", "filter_height",    "Filtr wysokości");
 bindToggle("btn-toggle-skipocr",      "skip_ocr",         "Skip OCR");
-bindToggle("btn-toggle-gemma",        "gemma_correction", "Korekcja Gemma AI");
+bindToggle("btn-toggle-vision",       "vision_ai",        "Wizyjny AI Florence-2");
 
 segThreshold.querySelectorAll(".seg-btn").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -764,10 +778,10 @@ function addHistory(text, rawText = null, isAiCorrected = false) {
   item.className = "history-item";
   const timeStr = new Date().toLocaleTimeString("pl-PL");
 
-  if (isAiCorrected && rawText && rawText !== text) {
+  if (isAiCorrected && rawText) {
     item.innerHTML = `
       <div class="history-item-ocr"><span class="badge-ocr">OCR ŚMIECI</span> ${escHtml(rawText)}</div>
-      <div class="history-item-ai"><span class="badge-ai">🤖 AI POPRAWIONE</span> ${escHtml(text)}</div>
+      <div class="history-item-ai"><span class="badge-ai">👁️ WIZYJNY AI</span> ${escHtml(text)}</div>
       <div class="history-item-time">${timeStr}</div>`;
   } else {
     item.innerHTML = `

@@ -109,13 +109,17 @@
           </span>
         </div>
 
-        <!-- OCR crop preview -->
+        <!-- Vision AI crop preview -->
         <div class="preview-box">
-          <div class="preview-label">Podgląd regionu (po korekcji)</div>
-          <div class="preview-img-wrap" id="preview-wrap">
-            <img id="ocr-preview" alt="Podgląd OCR" />
-            <div class="preview-empty" id="preview-empty">Brak zaznaczenia</div>
+          <div class="preview-hd">
+            <span class="preview-label">👁️ Region wycięty dla Wizyjnego AI</span>
+            <span class="preview-badge" id="preview-badge">Piksele z ROI</span>
           </div>
+          <div class="preview-img-wrap" id="preview-wrap">
+            <img id="ocr-preview" alt="Podgląd regionu dla Vision AI" />
+            <div class="preview-empty" id="preview-empty">Brak zaznaczenia ROI</div>
+          </div>
+          <div class="preview-meta" id="preview-meta">Wymiary wycinka: --×--px</div>
         </div>
 
         <!-- Sliders -->
@@ -189,9 +193,9 @@
 
           <div class="slider-row threshold-row">
             <div class="slider-meta">
-              <label>🤖 Korekcja AI (Google Gemma)</label>
+              <label>👁️ Wizyjny AI (OCR FIXER)</label>
             </div>
-            <button class="seg-btn" id="btn-toggle-gemma" type="button">Wyłączony</button>
+            <button class="seg-btn" id="btn-toggle-vision" type="button">Wyłączony</button>
           </div>
 
           <div class="slider-row threshold-row">

@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.ocr_worker import OCRWorker
 from backend.tts_worker import TTSWorker
-from backend.gemma_worker import GemmaWorker
+from backend.vision_worker import VisionWorker
 from backend.diff_utils import has_significant_change
 
 # ─── Paths ─────────────────────────────────────────────────────────────────
@@ -31,12 +31,12 @@ VOICES_DIR.mkdir(exist_ok=True, parents=True)
 # ─── Global workers (singletons) ────────────────────────────────────────────
 ocr_worker: OCRWorker | None = None
 tts_worker: TTSWorker | None = None
-gemma_worker: GemmaWorker | None = None
+vision_worker: VisionWorker | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ocr_worker, tts_worker, gemma_worker
+    global ocr_worker, tts_worker, vision_worker
     loop = asyncio.get_event_loop()
 
     print("[SubVoice] Loading OCR model (PaddleOCR GPU)...")
@@ -48,10 +48,10 @@ async def lifespan(app: FastAPI):
     await tts_worker.load_model()
     print("[SubVoice] TTS model ready.")
 
-    print("[SubVoice] Loading Gemma AI text correction model...")
-    gemma_worker = GemmaWorker()
-    await gemma_worker.load_model()
-    print("[SubVoice] Gemma AI ready.")
+    print("[SubVoice] Loading Vision AI OCR model (Florence-2 GPU)...")
+    vision_worker = VisionWorker()
+    await vision_worker.load_model()
+    print("[SubVoice] Vision AI ready.")
 
     # Auto-load first available voice file
     voice_files = list(VOICES_DIR.glob("*.[mMwWoOfF][pPaAgGlL][3344acACPP]*"))
@@ -215,31 +215,33 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 # OCR (blocking – run in thread pool)
                 try:
-                    text, confidence, preview_b64 = await loop.run_in_executor(
+                    raw_text, confidence, preview_b64, cropped_bytes = await loop.run_in_executor(
                         None, ocr_worker.process, img_bytes, roi, settings
                     )
-                    print(f"[WS] OCR result: conf={confidence:.2f} text='{text[:60]}'")
+                    raw_ocr_text = raw_text.strip()
+                    print(f"[WS] OCR result: conf={confidence:.2f} text='{raw_ocr_text[:60]}'")
                 except Exception as ocr_err:
                     print(f"[WS] OCR ERROR: {ocr_err}")
                     await push({"type": "error", "message": f"OCR error: {ocr_err}"})
                     continue
 
-                # Raw text output straight from PaddleOCR
-                raw_ocr_text = text.strip()
-
                 # Change detection & threshold comparison MUST be based on raw OCR output
                 changed = has_significant_change(last_text, raw_ocr_text)
 
-                gemma_enabled = settings.get("gemma_correction", False)
+                vision_enabled = settings.get("vision_ai", False)
                 final_text = raw_ocr_text
+                vision_corrected = False
 
-                # Apply AI correction only when changed and raw OCR text is non-empty
+                # Run Vision AI ONLY when frame changed and vision_ai is enabled
                 if changed and raw_ocr_text:
                     last_text = raw_ocr_text
-                    if gemma_enabled and gemma_worker:
-                        corrected = await loop.run_in_executor(None, gemma_worker.correct_text_sync, raw_ocr_text)
-                        if corrected:
-                            final_text = corrected
+                    if vision_enabled and vision_worker and cropped_bytes:
+                        v_text = await loop.run_in_executor(
+                            None, vision_worker.process_cropped_image_sync, cropped_bytes, raw_ocr_text
+                        )
+                        if v_text:
+                            final_text = v_text
+                            vision_corrected = True
 
                 await push({
                     "type": "ocr_result",
@@ -248,7 +250,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     "confidence": round(confidence * 100, 1),
                     "preview": preview_b64,
                     "changed": changed,
-                    "gemma_corrected": gemma_enabled and (raw_ocr_text != final_text),
+                    "vision_corrected": vision_corrected,
                 })
 
                 # Trigger TTS generation on final_text
@@ -257,7 +259,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     audio_path = AUDIO_DIR / audio_filename
                     speed = float(settings.get("speed", 1.0))
 
-                    async def _gen(txt=final_text, raw_txt=raw_ocr_text, path=audio_path, fname=audio_filename, spd=speed):
+                    async def _gen(txt=final_text, raw_txt=raw_ocr_text, path=audio_path, fname=audio_filename, spd=speed, v_corr=vision_corrected):
                         success = await loop.run_in_executor(
                             None, tts_worker.generate_sync, txt, str(path), 16, spd
                         )
@@ -267,12 +269,11 @@ async def websocket_endpoint(websocket: WebSocket):
                                 "url": f"/audio/{fname}",
                                 "raw_text": raw_txt,
                                 "text": txt,
-                                "gemma_corrected": gemma_enabled and (raw_txt != txt),
+                                "vision_corrected": v_corr,
                             })
                         else:
                             await push({
                                 "type": "tts_error",
-                                "text": txt,
                                 "message": "TTS generation failed (check model/voice)",
                             })
 

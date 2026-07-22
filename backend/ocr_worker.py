@@ -148,17 +148,13 @@ class OCRWorker:
         # ── Preprocessing ───────────────────────────────────────────────
         img_proc = self.preprocess(img, settings)
 
-        # ── Preview for frontend (compressed JPEG) ───────────────────────
-        _, preview_buf = cv2.imencode(
-            ".jpg", img_proc, [cv2.IMWRITE_JPEG_QUALITY, 35]
-        )
-        preview_b64 = base64.b64encode(preview_buf.tobytes()).decode()
-
         # ── OPTIMIZATION: Skip OCR on unchanged frames ────────────────────
         if settings.get("skip_ocr", False) and self._last_frame is not None and self._last_frame.shape == img_proc.shape:
             score = np.sum(cv2.absdiff(img_proc, self._last_frame)) / img_proc.size
             if score < 3.0:
-                return self._last_text, self._last_conf, preview_b64
+                _, preview_buf = cv2.imencode(".jpg", img_proc, [cv2.IMWRITE_JPEG_QUALITY, 40])
+                p_b64 = base64.b64encode(preview_buf.tobytes()).decode()
+                return self._last_text, self._last_conf, p_b64, preview_buf.tobytes()
 
         self._last_frame = img_proc.copy()
 
@@ -168,14 +164,18 @@ class OCRWorker:
             result = self.ocr.ocr(img_proc, cls=False)
         except Exception as e:
             print(f"[OCR] Inference error: {e}")
-            return "", 0.0, preview_b64
+            _, preview_buf = cv2.imencode(".jpg", img_proc, [cv2.IMWRITE_JPEG_QUALITY, 40])
+            p_b64 = base64.b64encode(preview_buf.tobytes()).decode()
+            return "", 0.0, p_b64, preview_buf.tobytes()
 
         if not result or not result[0]:
             self._last_text = ""
             self._last_conf = 0.0
-            return "", 0.0, preview_b64
+            _, preview_buf = cv2.imencode(".jpg", img_proc, [cv2.IMWRITE_JPEG_QUALITY, 40])
+            p_b64 = base64.b64encode(preview_buf.tobytes()).decode()
+            return "", 0.0, p_b64, preview_buf.tobytes()
 
-        # ── Sort lines top-to-bottom ─────────────────────────────────────
+        # ── Sort lines top-to-bottom & extract tight bounding box ──────
         lines = result[0]
         try:
             lines = sorted(lines, key=lambda l: l[0][0][1])
@@ -185,6 +185,8 @@ class OCRWorker:
         filter_height = settings.get("filter_height", False)
         texts: list[str] = []
         confs: list[float] = []
+        all_xs: list[float] = []
+        all_ys: list[float] = []
 
         for line in lines:
             if line and len(line) >= 2:
@@ -204,12 +206,38 @@ class OCRWorker:
                 if isinstance(text_conf, (list, tuple)) and len(text_conf) >= 2:
                     texts.append(str(text_conf[0]))
                     confs.append(float(text_conf[1]))
+                    for pt in bbox:
+                        all_xs.append(pt[0])
+                        all_ys.append(pt[1])
 
         full_text = " ".join(texts).strip()
         full_text = _normalize(full_text)
         avg_conf  = float(np.mean(confs)) if confs else 0.0
 
+        # ── Tight crop around detected text lines only ──────────────────
+        if all_xs and all_ys:
+            pad = 12
+            h_proc, w_proc = img_proc.shape[:2]
+            min_x = max(0, int(min(all_xs)) - pad)
+            max_x = min(w_proc, int(max(all_xs)) + pad)
+            min_y = max(0, int(min(all_ys)) - pad)
+            max_y = min(h_proc, int(max(all_ys)) + pad)
+
+            if (max_x - min_x) > 20 and (max_y - min_y) > 10:
+                tight_crop = img_proc[min_y:max_y, min_x:max_x]
+            else:
+                tight_crop = img_proc
+        else:
+            tight_crop = img_proc
+
+        # Encode tight crop as compressed JPEG
+        _, preview_buf = cv2.imencode(
+            ".jpg", tight_crop, [cv2.IMWRITE_JPEG_QUALITY, 55]
+        )
+        cropped_bytes = preview_buf.tobytes()
+        preview_b64   = base64.b64encode(cropped_bytes).decode()
+
         self._last_text = full_text
         self._last_conf = avg_conf
 
-        return full_text, avg_conf, preview_b64
+        return full_text, avg_conf, preview_b64, cropped_bytes
