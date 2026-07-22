@@ -24,6 +24,10 @@ class OCRWorker:
             det_db_unclip_ratio=2.0,      # Poszerza margines ramek detekcji (polskie znaki ś, ż, ą)
             rec_image_shape="3, 48, 640", # Szeroki bufor rozpoznawania dla długich zdań
         )
+        self._last_frame = None
+        self._last_text = ""
+        self._last_conf = 0.0
+        self._erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         print("[OCR] PaddleOCR initialized on GPU (subtitle-optimized mode).")
 
     @staticmethod
@@ -50,12 +54,14 @@ class OCRWorker:
     def preprocess(self, img: np.ndarray, settings: dict) -> np.ndarray:
         """
         Apply user-controlled preprocessing pipeline:
-          1. Brightness / Contrast
-          2. CLAHE (Adaptive Histogram Equalization)
-          3. Gaussian blur (noise reduction)
-          4. Sharpening
-          5. Binarisation (none / otsu / adaptive)
-          6. Smart scaling
+          1. Max-channel (yellow/white subtitle extraction)
+          2. Erode (glow/bloom removal)
+          3. Brightness / Contrast
+          4. CLAHE (Adaptive Histogram Equalization)
+          5. Gaussian blur (noise reduction)
+          6. Sharpening
+          7. Binarisation (none / otsu / adaptive)
+          8. Smart scaling + 25px Border padding
         """
         brightness = float(settings.get("brightness", 0))        # -100 .. +100
         contrast   = float(settings.get("contrast", 100)) / 100  # 50..300 → 0.5..3.0
@@ -63,7 +69,16 @@ class OCRWorker:
         sharpen    = int(settings.get("sharpen", 0))              # 0..10
         threshold  = settings.get("threshold", "none")            # none|otsu|adaptive
 
-        # 1. CLAHE (Adaptacyjny kontrast dla napisów na zmiennym tle - przed skalowaniem)
+        # 1. Max-Channel Preprocessing (Żółte i białe napisy → max pikseli)
+        if settings.get("max_channel", False):
+            max_ch = np.max(img[:, :, :3], axis=2)
+            img = cv2.cvtColor(max_ch, cv2.COLOR_GRAY2BGR)
+
+        # 2. Erozja poświaty (glow/bloom removal)
+        if settings.get("erode", False):
+            img = cv2.erode(img, self._erode_kernel, iterations=1)
+
+        # 3. CLAHE (Adaptacyjny kontrast dla napisów na zmiennym tle)
         if settings.get("clahe", False):
             lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
             l, a, b = cv2.split(lab)
@@ -72,21 +87,21 @@ class OCRWorker:
             limg = cv2.merge((cl, a, b))
             img = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
 
-        # 2. Kontrast i Jasność (f(x) = α·x + β)
+        # 4. Kontrast i Jasność (f(x) = α·x + β)
         img_out = cv2.convertScaleAbs(img, alpha=contrast, beta=brightness)
 
-        # 3. Odszumianie Gaussian Blur
+        # 5. Odszumianie Gaussian Blur
         if blur > 0:
             k = blur * 2 + 1
             img_out = cv2.GaussianBlur(img_out, (k, k), 0)
 
-        # 4. Wyostrzanie (Unsharp mask)
+        # 6. Wyostrzanie (Unsharp mask)
         if sharpen > 0:
             strength = sharpen / 10.0          # 0.1 .. 1.0
             blurred  = cv2.GaussianBlur(img_out, (0, 0), 3)
             img_out  = cv2.addWeighted(img_out, 1 + strength, blurred, -strength, 0)
 
-        # 5. Binaryzacja
+        # 7. Binaryzacja
         if threshold in ("otsu", "adaptive"):
             gray = cv2.cvtColor(img_out, cv2.COLOR_BGR2GRAY) if img_out.ndim == 3 else img_out
             if threshold == "otsu":
@@ -139,6 +154,14 @@ class OCRWorker:
         )
         preview_b64 = base64.b64encode(preview_buf.tobytes()).decode()
 
+        # ── OPTIMIZATION: Skip OCR on unchanged frames ────────────────────
+        if settings.get("skip_ocr", False) and self._last_frame is not None and self._last_frame.shape == img_proc.shape:
+            score = np.sum(cv2.absdiff(img_proc, self._last_frame)) / img_proc.size
+            if score < 3.0:
+                return self._last_text, self._last_conf, preview_b64
+
+        self._last_frame = img_proc.copy()
+
         # ── OCR inference ────────────────────────────────────────────────
         try:
             # cls=False przyspiesza wnioskowanie dla napisów (brak obrotu 180°)
@@ -148,6 +171,8 @@ class OCRWorker:
             return "", 0.0, preview_b64
 
         if not result or not result[0]:
+            self._last_text = ""
+            self._last_conf = 0.0
             return "", 0.0, preview_b64
 
         # ── Sort lines top-to-bottom ─────────────────────────────────────
@@ -157,12 +182,25 @@ class OCRWorker:
         except Exception:
             pass
 
+        filter_height = settings.get("filter_height", False)
         texts: list[str] = []
         confs: list[float] = []
 
         for line in lines:
             if line and len(line) >= 2:
+                bbox = line[0]
                 text_conf = line[1]
+
+                # ── Filtr wysokości tekstu (opcjonalny) ──────────────────
+                if filter_height and isinstance(bbox, (list, tuple)) and len(bbox) >= 3:
+                    try:
+                        line_h = abs(bbox[2][1] - bbox[0][1])
+                        # Ignoruj śmieci poniżej 12px lub powyżej 120px
+                        if line_h < 12 or line_h > 120:
+                            continue
+                    except Exception:
+                        pass
+
                 if isinstance(text_conf, (list, tuple)) and len(text_conf) >= 2:
                     texts.append(str(text_conf[0]))
                     confs.append(float(text_conf[1]))
@@ -170,5 +208,8 @@ class OCRWorker:
         full_text = " ".join(texts).strip()
         full_text = _normalize(full_text)
         avg_conf  = float(np.mean(confs)) if confs else 0.0
+
+        self._last_text = full_text
+        self._last_conf = avg_conf
 
         return full_text, avg_conf, preview_b64

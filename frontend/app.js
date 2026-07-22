@@ -25,14 +25,18 @@ const state = {
   drawingRoi:  false,
   roiStart:    null,      // { x,y } in canvas display-pixel space
   settings: {
-    brightness: 0,
-    contrast:   100,
-    blur:       0,
-    sharpen:    0,
-    threshold:  "none",
-    clahe:      false,
-    num_step:   16,
-    speed:      1.6,
+    brightness:    0,
+    contrast:      100,
+    blur:          0,
+    sharpen:       0,
+    threshold:     "none",
+    clahe:         false,
+    max_channel:   false,
+    erode:         false,
+    filter_height: false,
+    skip_ocr:      false,
+    num_step:      16,
+    speed:         1.6,
   },
   isCapturing: false,
   audioQueue:  [],
@@ -656,15 +660,23 @@ const outSpeed    = $("out-speed");
 if (slNumStep && outNumStep) bindSlider(slNumStep, outNumStep, "num_step", v => v);
 if (slSpeed && outSpeed)     bindSlider(slSpeed,   outSpeed,   "speed",    v => parseFloat(v).toFixed(1) + "×");
 
-const btnClahe = $("btn-toggle-clahe");
-if (btnClahe) {
-  btnClahe.addEventListener("click", () => {
-    state.settings.clahe = !state.settings.clahe;
-    btnClahe.classList.toggle("active", state.settings.clahe);
-    btnClahe.textContent = state.settings.clahe ? "Włączony" : "Wyłączony";
-    dbg("CLAHE set to: " + state.settings.clahe);
-  });
+function bindToggle(id, key, label) {
+  const btn = $(id);
+  if (btn) {
+    btn.addEventListener("click", () => {
+      state.settings[key] = !state.settings[key];
+      btn.classList.toggle("active", state.settings[key]);
+      btn.textContent = state.settings[key] ? "Włączony" : "Wyłączony";
+      dbg(`${label}: ${state.settings[key]}`);
+    });
+  }
 }
+
+bindToggle("btn-toggle-clahe",        "clahe",         "CLAHE");
+bindToggle("btn-toggle-maxchannel",   "max_channel",   "Max-Channel");
+bindToggle("btn-toggle-erode",        "erode",         "Erozja");
+bindToggle("btn-toggle-filterheight", "filter_height", "Filtr wysokości");
+bindToggle("btn-toggle-skipocr",      "skip_ocr",      "Skip OCR");
 
 segThreshold.querySelectorAll(".seg-btn").forEach(btn => {
   btn.addEventListener("click", () => {
