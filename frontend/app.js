@@ -33,10 +33,9 @@ const state = {
     clahe:         false,
     max_channel:   false,
     erode:         false,
-    filter_height: false,
-    skip_ocr:      false,
-    num_step:      16,
-    speed:         1.6,
+    skip_ocr:         false,
+    gemma_correction: false,
+    speed:            1.6,
   },
   isCapturing: false,
   audioQueue:  [],
@@ -534,10 +533,15 @@ function drawRoiOverlay() {
   roiCtx.strokeRect(px, py, pw, ph);
 }
 
+function setDefaultRoi() {
+  state.roi = { x: 0.0, y: 0.8, w: 1.0, h: 0.2 };
+  if (roiLabel) roiLabel.textContent = "Domyślny ROI: dół 20% (przeciągnij myszą by zmienić)";
+  drawRoiOverlay();
+  dbg("Default ROI set: bottom 20%");
+}
+
 function clearRoi() {
-  state.roi = null;
-  roiCtx.clearRect(0, 0, roiCanvas.width, roiCanvas.height);
-  roiLabel.textContent = "Przeciągnij myszą by zaznaczyć region OCR";
+  setDefaultRoi();
 }
 
 btnClearRoi.addEventListener("click", clearRoi);
@@ -546,29 +550,28 @@ btnClearRoi.addEventListener("click", clearRoi);
    OCR RESULT HANDLER
    ════════════════════════════════════════════════════ */
 function updateOcrResult(msg) {
-  const { text, confidence, preview, changed } = msg;
+  const { raw_text, text, confidence, preview, changed, gemma_corrected } = msg;
 
   // Confidence bar
   confFill.style.width = (confidence || 0) + "%";
   confVal.textContent  = (confidence || 0).toFixed(0) + "%";
 
-  // ALWAYS show current OCR text so user can see what's detected
-  const display = text.trim() || "(brak tekstu)";
-  if (text.trim()) {
-    // Show raw text in subtitle area regardless of change threshold
-    if (subtitleBody.dataset.raw !== display) {
-      subtitleBody.dataset.raw = display;
-      // Only animate when it truly changed for TTS
+  const rawDisplay = (raw_text || text || "").trim();
+  const finalDisplay = (text || "").trim();
+
+  if (finalDisplay) {
+    if (subtitleBody.dataset.raw !== finalDisplay) {
+      subtitleBody.dataset.raw = finalDisplay;
       if (changed) {
         subtitleBody.classList.remove("flash");
         void subtitleBody.offsetWidth;
         subtitleBody.classList.add("flash");
         subtitleCard.classList.add("active");
         setTimeout(() => subtitleCard.classList.remove("active"), 2000);
-        addHistory(text);
-        dbg(`TTS triggered: "${text.slice(0, 50)}"`);
+        addHistory(finalDisplay, rawDisplay, gemma_corrected);
+        dbg(`TTS triggered: "${finalDisplay.slice(0, 50)}"`);
       }
-      subtitleBody.textContent = text;
+      subtitleBody.textContent = finalDisplay;
     }
   } else {
     subtitleBody.dataset.raw = "";
@@ -697,8 +700,9 @@ function bindToggle(id, key, label) {
 bindToggle("btn-toggle-clahe",        "clahe",         "CLAHE");
 bindToggle("btn-toggle-maxchannel",   "max_channel",   "Max-Channel");
 bindToggle("btn-toggle-erode",        "erode",         "Erozja");
-bindToggle("btn-toggle-filterheight", "filter_height", "Filtr wysokości");
-bindToggle("btn-toggle-skipocr",      "skip_ocr",      "Skip OCR");
+bindToggle("btn-toggle-filterheight", "filter_height",    "Filtr wysokości");
+bindToggle("btn-toggle-skipocr",      "skip_ocr",         "Skip OCR");
+bindToggle("btn-toggle-gemma",        "gemma_correction", "Korekcja Gemma AI");
 
 segThreshold.querySelectorAll(".seg-btn").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -752,15 +756,25 @@ async function uploadVoice(file) {
 /* ════════════════════════════════════════════════════
    HISTORY
    ════════════════════════════════════════════════════ */
-function addHistory(text) {
+function addHistory(text, rawText = null, isAiCorrected = false) {
   const empty = histScroll.querySelector(".history-empty");
   if (empty) empty.remove();
 
   const item = document.createElement("div");
   item.className = "history-item";
-  item.innerHTML = `
-    <div class="history-item-text">${escHtml(text)}</div>
-    <div class="history-item-time">${new Date().toLocaleTimeString("pl-PL")}</div>`;
+  const timeStr = new Date().toLocaleTimeString("pl-PL");
+
+  if (isAiCorrected && rawText && rawText !== text) {
+    item.innerHTML = `
+      <div class="history-item-ocr"><span class="badge-ocr">OCR ŚMIECI</span> ${escHtml(rawText)}</div>
+      <div class="history-item-ai"><span class="badge-ai">🤖 AI POPRAWIONE</span> ${escHtml(text)}</div>
+      <div class="history-item-time">${timeStr}</div>`;
+  } else {
+    item.innerHTML = `
+      <div class="history-item-text">${escHtml(text)}</div>
+      <div class="history-item-time">${timeStr}</div>`;
+  }
+
   histScroll.insertBefore(item, histScroll.firstChild);
 
   while (histScroll.children.length > 50) histScroll.removeChild(histScroll.lastChild);
@@ -841,3 +855,4 @@ ttsTestBtn.addEventListener("click", async () => {
 setStatus("", "Rozłączony");
 updateQueueBadge();
 initCanvasSize();
+setDefaultRoi();

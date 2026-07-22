@@ -11,6 +11,10 @@ opencv-python-headless==4.10.0.84
 numpy==1.26.4
 Pillow==10.4.0
 
+# LLM Correction (Google Gemma)
+transformers>=4.38.0
+accelerate>=0.27.0
+
 # ONNX GPU execution for Piper TTS
 onnxruntime-gpu>=1.17.0
 

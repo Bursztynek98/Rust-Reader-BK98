@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.ocr_worker import OCRWorker
 from backend.tts_worker import TTSWorker
+from backend.gemma_worker import GemmaWorker
 from backend.diff_utils import has_significant_change
 
 # ─── Paths ─────────────────────────────────────────────────────────────────
@@ -30,21 +31,27 @@ VOICES_DIR.mkdir(exist_ok=True, parents=True)
 # ─── Global workers (singletons) ────────────────────────────────────────────
 ocr_worker: OCRWorker | None = None
 tts_worker: TTSWorker | None = None
+gemma_worker: GemmaWorker | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ocr_worker, tts_worker
+    global ocr_worker, tts_worker, gemma_worker
     loop = asyncio.get_event_loop()
 
     print("[SubVoice] Loading OCR model (PaddleOCR GPU)...")
     ocr_worker = await loop.run_in_executor(None, OCRWorker)
     print("[SubVoice] OCR model ready.")
 
-    print("[SubVoice] Loading TTS model (OmniVoice GPU)...")
+    print("[SubVoice] Loading TTS model (Piper GPU)...")
     tts_worker = TTSWorker()
     await tts_worker.load_model()
     print("[SubVoice] TTS model ready.")
+
+    print("[SubVoice] Loading Gemma AI text correction model...")
+    gemma_worker = GemmaWorker()
+    await gemma_worker.load_model()
+    print("[SubVoice] Gemma AI ready.")
 
     # Auto-load first available voice file
     voice_files = list(VOICES_DIR.glob("*.[mMwWoOfF][pPaAgGlL][3344acACPP]*"))
@@ -217,34 +224,50 @@ async def websocket_endpoint(websocket: WebSocket):
                     await push({"type": "error", "message": f"OCR error: {ocr_err}"})
                     continue
 
-                changed = has_significant_change(last_text, text)
+                # Raw text output straight from PaddleOCR
+                raw_ocr_text = text.strip()
+
+                # Change detection & threshold comparison MUST be based on raw OCR output
+                changed = has_significant_change(last_text, raw_ocr_text)
+
+                gemma_enabled = settings.get("gemma_correction", False)
+                final_text = raw_ocr_text
+
+                # Apply AI correction only when changed and raw OCR text is non-empty
+                if changed and raw_ocr_text:
+                    last_text = raw_ocr_text
+                    if gemma_enabled and gemma_worker:
+                        corrected = await loop.run_in_executor(None, gemma_worker.correct_text_sync, raw_ocr_text)
+                        if corrected:
+                            final_text = corrected
 
                 await push({
                     "type": "ocr_result",
-                    "text": text,
+                    "raw_text": raw_ocr_text,
+                    "text": final_text,
                     "confidence": round(confidence * 100, 1),
                     "preview": preview_b64,
                     "changed": changed,
+                    "gemma_corrected": gemma_enabled and (raw_ocr_text != final_text),
                 })
 
-                # Trigger TTS generation only on significant change
-                if changed and text.strip():
-                    last_text = text
+                # Trigger TTS generation on final_text
+                if changed and raw_ocr_text:
                     audio_filename = f"{uuid.uuid4().hex}.wav"
                     audio_path = AUDIO_DIR / audio_filename
-
-                    num_step = int(settings.get("num_step", 16))
                     speed = float(settings.get("speed", 1.0))
 
-                    async def _gen(txt=text, path=audio_path, fname=audio_filename, n_step=num_step, spd=speed):
+                    async def _gen(txt=final_text, raw_txt=raw_ocr_text, path=audio_path, fname=audio_filename, spd=speed):
                         success = await loop.run_in_executor(
-                            None, tts_worker.generate_sync, txt, str(path), n_step, spd
+                            None, tts_worker.generate_sync, txt, str(path), 16, spd
                         )
                         if success:
                             await push({
                                 "type": "audio_ready",
                                 "url": f"/audio/{fname}",
+                                "raw_text": raw_txt,
                                 "text": txt,
+                                "gemma_corrected": gemma_enabled and (raw_txt != txt),
                             })
                         else:
                             await push({

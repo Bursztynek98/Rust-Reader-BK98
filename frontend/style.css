@@ -778,11 +778,52 @@ body {
   line-height: 1.4;
 }
 
+.history-item-ocr {
+  font-size: 11px;
+  color: var(--txt-dim);
+  line-height: 1.4;
+  margin-bottom: 3px;
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+.history-item-ai {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-2);
+  line-height: 1.4;
+}
+
+.badge-ocr {
+  background: rgba(248,113,113,0.12);
+  color: var(--accent-err);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  margin-right: 4px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.badge-ai {
+  background: rgba(56,189,248,0.15);
+  color: var(--accent-2);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  margin-right: 4px;
+  display: inline-block;
+}
+
 .history-item-time {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--txt-dim);
-  margin-top: 3px;
+  margin-top: 4px;
 }
 
 @keyframes slide-in {
