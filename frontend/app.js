@@ -622,7 +622,7 @@ function onAudioReady({ url, text }) {
 
 function playAudio(url) {
   state.isPlaying      = true;
-  audioEl.playbackRate = 1.0;
+  audioEl.playbackRate = 1.5;
   audioEl.src          = url;
   audioEl.load();
   audioEl.play().catch(e => { console.warn("[Audio]", e); onAudioEnded(); });

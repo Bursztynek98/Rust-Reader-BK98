@@ -35,14 +35,33 @@ class VisionWorker:
 
             torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
-            self.processor = AutoProcessor.from_pretrained(MODEL_NAME)
-            self.model = Qwen2VLForConditionalGeneration.from_pretrained(
-                MODEL_NAME,
-                torch_dtype=torch_dtype,
-                device_map="auto" if torch.cuda.is_available() else None,
-            )
+            try:
+                # Try loading directly from local disk cache (instant offline load, no network check)
+                self.processor = AutoProcessor.from_pretrained(MODEL_NAME, local_files_only=True)
+                self.model = Qwen2VLForConditionalGeneration.from_pretrained(
+                    MODEL_NAME,
+                    torch_dtype=torch_dtype,
+                    low_cpu_mem_usage=True,
+                    device_map="auto" if torch.cuda.is_available() else None,
+                    local_files_only=True,
+                )
+            except Exception:
+                # Download model on first run if not cached locally
+                self.processor = AutoProcessor.from_pretrained(MODEL_NAME)
+                self.model = Qwen2VLForConditionalGeneration.from_pretrained(
+                    MODEL_NAME,
+                    torch_dtype=torch_dtype,
+                    low_cpu_mem_usage=True,
+                    device_map="auto" if torch.cuda.is_available() else None,
+                )
+
             self.model.eval()
             self.is_ready = True
+
+            import gc
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
             actual_device = next(self.model.parameters()).device
             print(f"[Vision-AI] Qwen2-VL model loaded successfully on target device: {actual_device} ({gpu_name})!")

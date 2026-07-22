@@ -23,7 +23,8 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    shm_size: '16gb'
+    shm_size: '2gb'
+    mem_limit: 6g
     # restart: unless-stopped
 
 volumes:

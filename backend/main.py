@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
     await tts_worker.load_model()
     print("[SubVoice] TTS model ready.")
 
-    print("[SubVoice] Loading Vision AI OCR model (Florence-2 GPU)...")
+    print("[SubVoice] Loading Vision AI OCR model...")
     vision_worker = VisionWorker()
     await vision_worker.load_model()
     print("[SubVoice] Vision AI ready.")
