@@ -135,7 +135,13 @@
 
         <!-- MIDDLE COLUMN: SCAN PREVIEW & ACTIVE SUBTITLE -->
         <section class="card panel-preview">
-          <h2 class="section-title">📺 Podgląd Skanowanego Kadru Na Żywo</h2>
+          <div class="section-title-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h2 class="section-title" style="margin-bottom: 0;">📺 Podgląd Kadru</h2>
+            <label class="checkbox-label" style="font-size: 0.82rem; color: #a1a1aa; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;">
+              <input type="checkbox" id="chk-toggle-preview" checked />
+              <span>Podgląd na żywo (Auto-pauza w tle)</span>
+            </label>
+          </div>
 
           <div class="preview-container">
             <img id="img-scan-preview" src="" alt="Czekam na pierwszą klatkę skanowania..." />

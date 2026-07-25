@@ -91,6 +91,7 @@ pub fn capture_and_crop(
     target_id: &str,
     crop: &CropRegion,
     filters: &[String],
+    generate_preview: bool,
 ) -> Result<FrameCaptureResult> {
     let cap_start = Instant::now();
 
@@ -115,19 +116,23 @@ pub fn capture_and_crop(
     // Apply active multi-filter chain (padding, contrast, binarize, sharpen, upscale)
     let filtered_dyn = apply_ocr_filters(&cropped_dyn, filters);
 
-    // Ultra-fast Nearest-neighbor scaling for preview thumbnail (sub-millisecond)
-    let preview_thumb = if filtered_dyn.width() > 520 {
-        let th_h = (520 * filtered_dyn.height()) / filtered_dyn.width();
-        filtered_dyn.resize(520, th_h.max(10), imageops::FilterType::Nearest)
+    let preview_base64 = if generate_preview {
+        let preview_thumb = if filtered_dyn.width() > 520 {
+            let th_h = (520 * filtered_dyn.height()) / filtered_dyn.width();
+            filtered_dyn.resize(520, th_h.max(10), imageops::FilterType::Nearest)
+        } else {
+            filtered_dyn.clone()
+        };
+
+        let mut jpeg_bytes = Vec::new();
+        let mut cursor = Cursor::new(&mut jpeg_bytes);
+        let _ = preview_thumb.write_to(&mut cursor, ImageFormat::Jpeg);
+
+        format!("data:image/jpeg;base64,{}", STANDARD.encode(&jpeg_bytes))
     } else {
-        filtered_dyn.clone()
+        String::new()
     };
 
-    let mut jpeg_bytes = Vec::new();
-    let mut cursor = Cursor::new(&mut jpeg_bytes);
-    let _ = preview_thumb.write_to(&mut cursor, ImageFormat::Jpeg);
-
-    let preview_base64 = format!("data:image/jpeg;base64,{}", STANDARD.encode(&jpeg_bytes));
     let duration_ms = cap_start.elapsed().as_secs_f64() * 1000.0;
 
     Ok(FrameCaptureResult {

@@ -85,6 +85,29 @@ document.addEventListener("DOMContentLoaded", async () => {
   const historyTbody = document.getElementById("history-tbody") as HTMLTableSectionElement;
   const historyCount = document.getElementById("history-count") as HTMLSpanElement;
 
+  const chkTogglePreview = document.getElementById("chk-toggle-preview") as HTMLInputElement;
+
+  let isWindowFocused = true;
+
+  function updatePreviewState() {
+    const isEnabled = isWindowFocused && (chkTogglePreview ? chkTogglePreview.checked : true);
+    invoke("set_preview_enabled", { enabled: isEnabled });
+  }
+
+  if (chkTogglePreview) {
+    chkTogglePreview.addEventListener("change", updatePreviewState);
+  }
+
+  window.addEventListener("focus", () => {
+    isWindowFocused = true;
+    updatePreviewState();
+  });
+
+  window.addEventListener("blur", () => {
+    isWindowFocused = false;
+    updatePreviewState();
+  });
+
   let historyItemsCount = 0;
 
   // 1. Fetch available capture targets

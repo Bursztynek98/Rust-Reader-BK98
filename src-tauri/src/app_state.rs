@@ -49,6 +49,7 @@ pub struct TelemetryData {
 
 pub struct AppState {
     pub is_paused: Arc<AtomicBool>,
+    pub is_preview_enabled: Arc<AtomicBool>,
     pub scan_interval_ms: Arc<AtomicU64>,
     pub target_id: Arc<Mutex<String>>,
     pub crop_region: Arc<Mutex<CropRegion>>,
@@ -70,6 +71,7 @@ pub struct AppState {
 impl AppState {
     pub fn new() -> Self {
         let is_paused = Arc::new(AtomicBool::new(true));
+        let is_preview_enabled = Arc::new(AtomicBool::new(true));
         let scan_interval_ms = Arc::new(AtomicU64::new(300));
         let target_id = Arc::new(Mutex::new("mon_0".to_string()));
         let crop_region = Arc::new(Mutex::new(CropRegion::default()));
@@ -88,6 +90,7 @@ impl AppState {
 
         Self {
             is_paused,
+            is_preview_enabled,
             scan_interval_ms,
             target_id,
             crop_region,
@@ -151,6 +154,7 @@ impl AppState {
             loop {
                 let interval = state.scan_interval_ms.load(Ordering::Relaxed).max(100);
                 let paused = state.is_paused.load(Ordering::Relaxed);
+                let is_preview_active = state.is_preview_enabled.load(Ordering::Relaxed);
                 let is_ocr_ready = state.ocr_loaded.load(Ordering::Relaxed);
                 let is_tts_ready = state.tts_loaded.load(Ordering::Relaxed);
 
@@ -158,13 +162,15 @@ impl AppState {
                 let crop = state.crop_region.lock().clone();
                 let active_filters = state.ocr_filters.lock().clone();
 
-                // Capture frame, crop, apply active multi-filters & emit live preview Data URI
-                if let Ok(frame_res) = capture_and_crop(&target, &crop, &active_filters) {
+                // Capture frame, crop, apply active multi-filters & emit live preview Data URI if enabled
+                if let Ok(frame_res) = capture_and_crop(&target, &crop, &active_filters, is_preview_active) {
                     last_cap_time = frame_res.duration_ms;
 
-                    let _ = app_handle.emit("scan_preview", serde_json::json!({
-                        "preview_base64": frame_res.preview_base64
-                    }));
+                    if is_preview_active && !frame_res.preview_base64.is_empty() {
+                        let _ = app_handle.emit("scan_preview", serde_json::json!({
+                            "preview_base64": frame_res.preview_base64
+                        }));
+                    }
 
                     if !paused && is_ocr_ready {
                         let (img_changed, new_hash) = has_image_changed(last_frame_hash, &frame_res.filtered_image);

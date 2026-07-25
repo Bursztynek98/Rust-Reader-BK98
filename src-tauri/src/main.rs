@@ -101,6 +101,12 @@ fn toggle_pause(state: State<'_, Arc<AppState>>) -> Result<bool, String> {
 }
 
 #[tauri::command]
+fn set_preview_enabled(state: State<'_, Arc<AppState>>, enabled: bool) -> Result<(), String> {
+    state.is_preview_enabled.store(enabled, Ordering::Relaxed);
+    Ok(())
+}
+
+#[tauri::command]
 fn get_history(state: State<'_, Arc<AppState>>) -> Result<Vec<SubtitleHistoryEntry>, String> {
     Ok(state.history.lock().clone())
 }
@@ -121,6 +127,7 @@ fn main() {
             set_crop,
             set_ocr_filters,
             set_scan_interval,
+            set_preview_enabled,
             set_tts_voice,
             set_tts_speed,
             set_tts_volume,
