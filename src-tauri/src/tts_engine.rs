@@ -56,7 +56,7 @@ pub struct GeneratedAudio {
 }
 
 pub struct TtsEngine {
-    active_voice_key: String,
+    active_voice_key: Mutex<String>,
     tts_instance: Mutex<Option<OfflineTts>>,
 }
 
@@ -69,7 +69,7 @@ impl TtsEngine {
         };
 
         let engine = Self {
-            active_voice_key: voice_key.clone(),
+            active_voice_key: Mutex::new(voice_key.clone()),
             tts_instance: Mutex::new(None),
         };
 
@@ -118,6 +118,7 @@ impl TtsEngine {
 
         let mut lock = self.tts_instance.lock().unwrap();
         *lock = Some(tts);
+        *self.active_voice_key.lock().unwrap() = voice_key.to_string();
         Ok(())
     }
 
@@ -127,10 +128,12 @@ impl TtsEngine {
             .as_ref()
             .ok_or_else(|| anyhow!("TTS engine is not initialized"))?;
 
-        let is_supertonic = self.active_voice_key == "supertonic";
+        let current_voice = self.active_voice_key.lock().unwrap().clone();
+        let is_supertonic = current_voice == "supertonic";
         let mut extra_map = HashMap::new();
         if is_supertonic {
             extra_map.insert("lang".to_string(), serde_json::Value::String("pl".to_string()));
+            extra_map.insert("language".to_string(), serde_json::Value::String("pl".to_string()));
         }
 
         let gen_config = GenerationConfig {
