@@ -62,8 +62,8 @@ impl OcrEngine {
 
         let ocr = OAROCRBuilder::new(
             "pp-ocrv6_tiny_det.onnx",
-            "pp-ocrv6_tiny_rec.onnx",
-            "ppocrv6_tiny_dict.txt",
+            "pp-ocrv6_small_rec.onnx",
+            "ppocrv6_dict.txt",
         )
         .ort_session(ort_config)
         .build()
