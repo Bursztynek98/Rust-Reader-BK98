@@ -1,0 +1,35 @@
+[package]
+name = "rust-reader"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+parking_lot = "0.12"
+anyhow = "1.0"
+image = "0.25"
+base64 = "0.22"
+strsim = "0.11"
+reqwest = { version = "0.12", features = ["blocking"] }
+tar = "0.4"
+bzip2 = "0.5"
+indicatif = "0.17"
+
+# OCR Dependencies (Pure Rust + ONNX runtime)
+oar-ocr = { version = "0.8.0", features = ["cuda", "tensorrt", "auto-download"] }
+nvml-wrapper = "0.10.0"
+symspell = "0.3.0"
+
+# TTS & Audio Dependencies
+sherpa-onnx = "1.13.4"
+rodio = "0.19"
+hound = "3.5.1"
+
+# Window / Screen Capture
+xcap = "0.0.14"
