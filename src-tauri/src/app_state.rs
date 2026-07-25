@@ -63,6 +63,7 @@ pub struct AppState {
     pub is_preview_enabled: Arc<AtomicBool>,
     pub scan_interval_ms: Arc<AtomicU64>,
     pub autocorrect_threshold: Arc<Mutex<f32>>,
+    pub word_reject_threshold: Arc<Mutex<f32>>,
     pub target_id: Arc<Mutex<String>>,
     pub crop_region: Arc<Mutex<CropRegion>>,
     pub ocr_filters: Arc<Mutex<Vec<String>>>,
@@ -86,6 +87,7 @@ impl AppState {
         let is_preview_enabled = Arc::new(AtomicBool::new(true));
         let scan_interval_ms = Arc::new(AtomicU64::new(300));
         let autocorrect_threshold = Arc::new(Mutex::new(0.95f32));
+        let word_reject_threshold = Arc::new(Mutex::new(0.40f32));
         let target_id = Arc::new(Mutex::new("mon_0".to_string()));
         let crop_region = Arc::new(Mutex::new(CropRegion::default()));
         let ocr_filters = Arc::new(Mutex::new(vec!["padding20".to_string(), "contrast".to_string()]));
@@ -106,6 +108,7 @@ impl AppState {
             is_preview_enabled,
             scan_interval_ms,
             autocorrect_threshold,
+            word_reject_threshold,
             target_id,
             crop_region,
             ocr_filters,
@@ -195,7 +198,8 @@ impl AppState {
                             let ocr_guard = state.ocr_engine.lock();
                             if let Some(ref ocr) = *ocr_guard {
                                 let threshold = *state.autocorrect_threshold.lock();
-                                if let Ok(ocr_res) = ocr.process_image(&frame_res.filtered_image, threshold) {
+                                let reject_threshold = *state.word_reject_threshold.lock();
+                                if let Ok(ocr_res) = ocr.process_image(&frame_res.filtered_image, threshold, reject_threshold) {
                                     last_ocr_time = ocr_res.duration_ms;
                                     let now_str = chrono_now_str();
 

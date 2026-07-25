@@ -114,6 +114,13 @@ fn set_autocorrect_threshold(state: State<'_, Arc<AppState>>, threshold_pct: f32
 }
 
 #[tauri::command]
+fn set_word_reject_threshold(state: State<'_, Arc<AppState>>, threshold_pct: f32) -> Result<(), String> {
+    let threshold = (threshold_pct / 100.0).clamp(0.0, 1.0);
+    *state.word_reject_threshold.lock() = threshold;
+    Ok(())
+}
+
+#[tauri::command]
 fn get_history(state: State<'_, Arc<AppState>>) -> Result<Vec<SubtitleHistoryEntry>, String> {
     Ok(state.history.lock().clone())
 }
@@ -136,6 +143,7 @@ fn main() {
             set_scan_interval,
             set_preview_enabled,
             set_autocorrect_threshold,
+            set_word_reject_threshold,
             set_tts_voice,
             set_tts_speed,
             set_tts_volume,

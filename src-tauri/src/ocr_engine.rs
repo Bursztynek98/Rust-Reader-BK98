@@ -77,7 +77,12 @@ impl OcrEngine {
         })
     }
 
-    pub fn process_image(&self, img: &DynamicImage, autocorrect_threshold: f32) -> Result<OcrResult> {
+    pub fn process_image(
+        &self,
+        img: &DynamicImage,
+        autocorrect_threshold: f32,
+        word_reject_threshold: f32,
+    ) -> Result<OcrResult> {
         let start = Instant::now();
         let frame_w = img.width();
         let frame_h = img.height();
@@ -102,6 +107,11 @@ impl OcrEngine {
         if let Some(res) = predictions.first() {
             for region in &res.text_regions {
                 if let Some((raw_text, confidence)) = region.text_with_confidence() {
+                    // Reject low-confidence OCR regions completely (e.g. confidence < 40%)
+                    if confidence < word_reject_threshold {
+                        boxes_filtered += 1;
+                        continue;
+                    }
                     let mut box_w = 50u32;
                     let mut box_h = 20u32;
 

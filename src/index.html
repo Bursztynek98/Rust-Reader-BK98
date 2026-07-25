@@ -63,8 +63,8 @@
             </div>
           </div>
 
-          <!-- AUTOCORRECT THRESHOLD -->
-          <h3 class="subsection-title">🪄 Auto-Korekta Słownika (SymSpell)</h3>
+          <!-- AUTOCORRECT & NOISE REJECTION THRESHOLDS -->
+          <h3 class="subsection-title">🪄 Auto-Korekta &amp; Filtrowanie Szumów</h3>
           <div class="control-group">
             <div class="control-label-row">
               <label for="slider-autocorrect-threshold">Koryguj słowa z pewnością poniżej:</label>
@@ -76,6 +76,20 @@
               <span>80%</span>
               <span>95% (Domyślnie)</span>
               <span>100% (Zawsze)</span>
+            </div>
+          </div>
+
+          <div class="control-group" style="margin-top: 6px;">
+            <div class="control-label-row">
+              <label for="slider-word-reject-threshold">Odznaczaj słowa (Szum) z pewnością &lt; :</label>
+              <span id="val-word-reject-threshold" class="val-badge">40 %</span>
+            </div>
+            <input type="range" id="slider-word-reject-threshold" min="0" max="80" step="5" value="40" />
+            <div class="slider-ticks">
+              <span>0% (Brak)</span>
+              <span>40% (Domyślnie)</span>
+              <span>60%</span>
+              <span>80% (Surowo)</span>
             </div>
           </div>
 

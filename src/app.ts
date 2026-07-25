@@ -84,6 +84,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const sliderAutocorrectThreshold = document.getElementById("slider-autocorrect-threshold") as HTMLInputElement;
   const valAutocorrectThreshold = document.getElementById("val-autocorrect-threshold") as HTMLSpanElement;
 
+  const sliderWordRejectThreshold = document.getElementById("slider-word-reject-threshold") as HTMLInputElement;
+  const valWordRejectThreshold = document.getElementById("val-word-reject-threshold") as HTMLSpanElement;
+
   const imgScanPreview = document.getElementById("img-scan-preview") as HTMLImageElement;
   const previewCropInfo = document.getElementById("preview-crop-info") as HTMLSpanElement;
   const activeTimestamp = document.getElementById("active-timestamp") as HTMLSpanElement;
@@ -132,6 +135,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       const val = parseInt(sliderAutocorrectThreshold.value, 10);
       valAutocorrectThreshold.textContent = `${val} %`;
       invoke("set_autocorrect_threshold", { thresholdPct: val });
+    });
+  }
+
+  if (sliderWordRejectThreshold && valWordRejectThreshold) {
+    sliderWordRejectThreshold.addEventListener("input", () => {
+      const val = parseInt(sliderWordRejectThreshold.value, 10);
+      valWordRejectThreshold.textContent = `${val} %`;
+      invoke("set_word_reject_threshold", { thresholdPct: val });
     });
   }
 
