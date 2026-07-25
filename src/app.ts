@@ -86,12 +86,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   const historyCount = document.getElementById("history-count") as HTMLSpanElement;
 
   const chkTogglePreview = document.getElementById("chk-toggle-preview") as HTMLInputElement;
+  const previewDisabledPlaceholder = document.getElementById("preview-disabled-placeholder") as HTMLDivElement;
+  const liveTag = document.getElementById("live-tag") as HTMLSpanElement;
 
   let isWindowFocused = true;
 
   function updatePreviewState() {
     const isEnabled = isWindowFocused && (chkTogglePreview ? chkTogglePreview.checked : true);
     invoke("set_preview_enabled", { enabled: isEnabled });
+
+    if (previewDisabledPlaceholder) {
+      if (isEnabled) {
+        previewDisabledPlaceholder.style.display = "none";
+        if (imgScanPreview) imgScanPreview.style.opacity = "1";
+        if (liveTag) liveTag.style.display = "inline-block";
+      } else {
+        previewDisabledPlaceholder.style.display = "flex";
+        if (imgScanPreview) imgScanPreview.style.opacity = "0.15";
+        if (liveTag) liveTag.style.display = "none";
+      }
+    }
   }
 
   if (chkTogglePreview) {
