@@ -33,3 +33,11 @@ hound = "3.5.1"
 
 # Window / Screen Capture
 xcap = "0.0.14"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+

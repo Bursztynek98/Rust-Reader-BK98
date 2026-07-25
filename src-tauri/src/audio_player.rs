@@ -40,7 +40,14 @@ impl AudioPlayer {
                 let mut pending_queue: Vec<AudioItem> = Vec::new();
 
                 loop {
-                    // Receive items from channel
+                    // Efficiently block thread when queue & sink are empty, waking up immediately on new audio
+                    if pending_queue.is_empty() && sink.empty() {
+                        if let Ok(item) = rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                            pending_queue.push(item);
+                        }
+                    }
+
+                    // Receive any remaining queued items from channel
                     while let Ok(item) = rx.try_recv() {
                         pending_queue.push(item);
                     }
@@ -78,7 +85,7 @@ impl AudioPlayer {
                         sink.append(source);
                     }
 
-                    thread::sleep(std::time::Duration::from_millis(20));
+                    thread::sleep(std::time::Duration::from_millis(15));
                 }
             }
         });

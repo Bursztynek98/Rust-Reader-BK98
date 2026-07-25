@@ -88,7 +88,48 @@ pub fn has_significant_change(old_text: &str, new_text: &str) -> bool {
     ratio < CHANGE_THRESHOLD
 }
 
+/// 256-bit Average Hash (aHash) for fast frame difference detection (<0.1ms)
+pub type FrameHash = [u64; 4];
+
+pub fn compute_frame_hash(img: &image::DynamicImage) -> FrameHash {
+    use image::imageops;
+    let resized = img.resize_exact(16, 16, imageops::FilterType::Nearest);
+    let gray = resized.to_luma8();
+    let pixels = gray.as_raw();
+
+    let sum: u32 = pixels.iter().map(|&p| p as u32).sum();
+    let avg = (sum / 256) as u8;
+
+    let mut hash = [0u64; 4];
+    for (i, &p) in pixels.iter().enumerate() {
+        if p >= avg {
+            let chunk = i / 64;
+            let bit = i % 64;
+            hash[chunk] |= 1u64 << bit;
+        }
+    }
+    hash
+}
+
+/// Returns true if the captured image changed significantly compared to `prev_hash`.
+pub fn has_image_changed(prev_hash: Option<FrameHash>, current_img: &image::DynamicImage) -> (bool, FrameHash) {
+    let current_hash = compute_frame_hash(current_img);
+    let prev = match prev_hash {
+        Some(h) => h,
+        None => return (true, current_hash),
+    };
+
+    let diff_bits: u32 = prev.iter()
+        .zip(current_hash.iter())
+        .map(|(&a, &b)| (a ^ b).count_ones())
+        .sum();
+
+    // If Hamming distance > 6 bits out of 256 (~2.3% difference), image has changed
+    (diff_bits > 6, current_hash)
+}
+
 #[cfg(test)]
+
 mod tests {
     use super::*;
 

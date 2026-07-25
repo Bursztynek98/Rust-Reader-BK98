@@ -9,10 +9,11 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 use crate::audio_player::{AudioItem, AudioPlayer};
-use crate::diff_filter::has_significant_change;
+use crate::diff_filter::{has_image_changed, has_significant_change, FrameHash};
 use crate::ocr_engine::OcrEngine;
 use crate::tts_engine::TtsEngine;
 use crate::window_capture::{capture_and_crop, CropRegion};
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleHistoryEntry {
@@ -145,6 +146,8 @@ impl AppState {
             let mut last_ocr_time = 0.0f64;
             let mut last_tts_time = 0.0f64;
 
+            let mut last_frame_hash: Option<FrameHash> = None;
+
             loop {
                 let interval = state.scan_interval_ms.load(Ordering::Relaxed).max(100);
                 let paused = state.is_paused.load(Ordering::Relaxed);
@@ -164,13 +167,17 @@ impl AppState {
                     }));
 
                     if !paused && is_ocr_ready {
-                        let ocr_guard = state.ocr_engine.lock();
-                        if let Some(ref ocr) = *ocr_guard {
-                            if let Ok(ocr_res) = ocr.process_image(&frame_res.filtered_image) {
-                                last_ocr_time = ocr_res.duration_ms;
-                                let now_str = chrono_now_str();
+                        let (img_changed, new_hash) = has_image_changed(last_frame_hash, &frame_res.filtered_image);
+                        if img_changed {
+                            last_frame_hash = Some(new_hash);
+                            let ocr_guard = state.ocr_engine.lock();
+                            if let Some(ref ocr) = *ocr_guard {
+                                if let Ok(ocr_res) = ocr.process_image(&frame_res.filtered_image) {
+                                    last_ocr_time = ocr_res.duration_ms;
+                                    let now_str = chrono_now_str();
 
-                                if !ocr_res.corrected_text.is_empty() {
+                                    if !ocr_res.corrected_text.is_empty() {
+
                                     let mut last_txt = state.last_spoken_text.lock();
                                     
                                     if has_significant_change(&last_txt, &ocr_res.corrected_text) {
@@ -224,6 +231,7 @@ impl AppState {
                         }
                     }
                 }
+            }
 
                 let qlen = state.get_audio_queue_len();
                 let b_speed = *state.tts_speed.lock();

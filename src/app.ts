@@ -270,6 +270,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     historyTbody.insertBefore(tr, historyTbody.firstChild);
     historyItemsCount += 1;
     historyCount.textContent = `${historyItemsCount} wpisów`;
+
+    // Cap DOM nodes at 100 elements to prevent UI lag and memory bloat over long sessions
+    if (historyTbody.children.length > 100) {
+      historyTbody.lastElementChild?.remove();
+    }
   });
 });
 
