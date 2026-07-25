@@ -14,15 +14,13 @@
       <!-- HEADER -->
       <header class="app-header">
         <div class="brand">
-          <div class="logo-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/>
-              <path d="M10 8l6 4-6 4V8z"/>
-            </svg>
-          </div>
+          <img src="/app_icon.png" class="brand-logo-img" alt="Rust Reader Logo" />
           <div>
-            <h1>Rust Reader <span class="badge-720p">720p UI</span></h1>
-            <p class="subtitle">Real-time OCR & TTS Subtitle Assistant</p>
+            <h1>Rust Reader <span class="badge-author">By BursztyneK98</span></h1>
+            <div class="model-status-row">
+              <span id="badge-ocr" class="status-pill loading">OCR: Ładowanie...</span>
+              <span id="badge-tts" class="status-pill loading">TTS: Ładowanie...</span>
+            </div>
           </div>
         </div>
 
@@ -37,9 +35,10 @@
             </button>
           </div>
 
-          <button id="btn-pause" class="btn btn-pause">
-            <span class="status-dot active"></span>
-            <span id="pause-text">SKANOWANIE AKTYWNE</span>
+          <!-- DEFAULT OFF (PAUSED) BUTTON STATE -->
+          <button id="btn-pause" class="btn btn-pause paused">
+            <span class="status-dot"></span>
+            <span id="pause-text">▶️ START SKANOWANIA</span>
           </button>
         </div>
       </header>
@@ -61,6 +60,22 @@
               <span>100ms</span>
               <span>500ms</span>
               <span>1000ms</span>
+            </div>
+          </div>
+
+          <!-- AUTOCORRECT THRESHOLD -->
+          <h3 class="subsection-title">🪄 Auto-Korekta Słownika (SymSpell)</h3>
+          <div class="control-group">
+            <div class="control-label-row">
+              <label for="slider-autocorrect-threshold">Koryguj słowa z pewnością poniżej:</label>
+              <span id="val-autocorrect-threshold" class="val-badge">95 %</span>
+            </div>
+            <input type="range" id="slider-autocorrect-threshold" min="50" max="100" step="1" value="95" />
+            <div class="slider-ticks">
+              <span>50% (Rzadko)</span>
+              <span>80%</span>
+              <span>95% (Domyślnie)</span>
+              <span>100% (Zawsze)</span>
             </div>
           </div>
 
@@ -166,7 +181,10 @@
           <div class="active-subtitle-box">
             <div class="box-header">
               <span class="box-label">OSTATNIO ODCZYTANY NAPIS</span>
-              <span id="active-timestamp" class="timestamp">--:--:--</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="active-confidence" class="val-badge" style="background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);">Pewność: --%</span>
+                <span id="active-timestamp" class="timestamp">--:--:--</span>
+              </div>
             </div>
             <div id="text-corrected" class="active-text">Oczekiwanie na pierwszy wykryty napis...</div>
             <div class="raw-subtext">
@@ -182,6 +200,14 @@
 
           <!-- METRICS GRID -->
           <div class="metrics-grid">
+            <div class="metric-card">
+              <span class="metric-value" id="metric-cap-time">0 ms</span>
+              <span class="metric-label">Czas Kadru</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-value" id="metric-filter-time">0 ms</span>
+              <span class="metric-label">Czas Filtrów</span>
+            </div>
             <div class="metric-card">
               <span class="metric-value" id="metric-ocr-time">0 ms</span>
               <span class="metric-label">Czas OCR</span>
@@ -208,17 +234,21 @@
 
           <div class="history-scroll-container">
             <table class="history-table">
+              <colgroup>
+                <col style="width: 60px;" />
+                <col style="width: auto;" />
+                <col style="width: 75px;" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Czas</th>
-                  <th>Wykryto z OCR (Surowy)</th>
-                  <th>Auto-Korekta SymSpell</th>
-                  <th>OCR / TTS</th>
+                  <th>Napis</th>
+                  <th style="text-align: right;">Czasy</th>
                 </tr>
               </thead>
               <tbody id="history-tbody">
                 <tr class="empty-row">
-                  <td colspan="4">Brak wpisów w historii. Uruchom skanowanie okna z napisam!</td>
+                  <td colspan="3">Brak wpisów w historii. Uruchom skanowanie okna z napisami!</td>
                 </tr>
               </tbody>
             </table>

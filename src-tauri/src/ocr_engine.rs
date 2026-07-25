@@ -10,12 +10,14 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::Instant;
 
+use crate::app_state::WordInfo;
 use crate::box_filter::{is_clean_text, is_valid_box_size, sanitize_text};
 
 pub struct OcrResult {
     pub raw_text: String,
     pub corrected_text: String,
     pub confidence: f32,
+    pub words: Vec<WordInfo>,
     pub duration_ms: f64,
     pub boxes_passed: usize,
     pub boxes_filtered: usize,
@@ -75,7 +77,7 @@ impl OcrEngine {
         })
     }
 
-    pub fn process_image(&self, img: &DynamicImage) -> Result<OcrResult> {
+    pub fn process_image(&self, img: &DynamicImage, autocorrect_threshold: f32) -> Result<OcrResult> {
         let start = Instant::now();
         let frame_w = img.width();
         let frame_h = img.height();
@@ -91,6 +93,7 @@ impl OcrEngine {
 
         let mut raw_parts = Vec::new();
         let mut corrected_parts = Vec::new();
+        let mut all_words = Vec::new();
         let mut total_conf = 0.0f32;
         let mut count = 0usize;
         let mut boxes_passed = 0usize;
@@ -130,22 +133,39 @@ impl OcrEngine {
 
                     boxes_passed += 1;
 
-                    // Spell check auto-correction on words
-                    let sym = self.symspell.lock().unwrap();
-                    let corrected_words: Vec<String> = clean_raw
-                        .split_whitespace()
-                        .map(|word| {
+                    let mut line_corrected_words = Vec::new();
+                    for word in clean_raw.split_whitespace() {
+                        let raw_word = word.to_string();
+                        let (corr_word, is_corr) = if confidence >= autocorrect_threshold {
+                            (raw_word.clone(), false)
+                        } else {
                             if word.len() > 2 {
+                                let sym = self.symspell.lock().unwrap();
                                 let suggestions = sym.lookup(word, Verbosity::Top, 2);
                                 if let Some(sug) = suggestions.first() {
-                                    return sug.term.clone();
+                                    if sug.term != raw_word {
+                                        (sug.term.clone(), true)
+                                    } else {
+                                        (raw_word.clone(), false)
+                                    }
+                                } else {
+                                    (raw_word.clone(), false)
                                 }
+                            } else {
+                                (raw_word.clone(), false)
                             }
-                            word.to_string()
-                        })
-                        .collect();
+                        };
 
-                    let corrected_line = corrected_words.join(" ");
+                        line_corrected_words.push(corr_word.clone());
+                        all_words.push(WordInfo {
+                            raw: raw_word,
+                            corrected: corr_word,
+                            confidence,
+                            is_corrected: is_corr,
+                        });
+                    }
+
+                    let corrected_line = line_corrected_words.join(" ");
 
                     raw_parts.push(clean_raw);
                     corrected_parts.push(corrected_line);
@@ -163,6 +183,7 @@ impl OcrEngine {
             raw_text,
             corrected_text,
             confidence: avg_conf,
+            words: all_words,
             duration_ms,
             boxes_passed,
             boxes_filtered,

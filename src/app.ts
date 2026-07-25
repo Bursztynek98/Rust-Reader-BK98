@@ -7,13 +7,22 @@ interface CaptureTargetInfo {
   is_window: boolean;
 }
 
+interface WordInfo {
+  raw: string;
+  corrected: string;
+  confidence: number;
+  is_corrected: boolean;
+}
+
 interface SubtitleHistoryEntry {
   id: number;
   timestamp: string;
   raw_text: string;
   corrected_text: string;
   confidence: number;
+  words: WordInfo[];
   capture_time_ms: number;
+  filter_time_ms: number;
   ocr_time_ms: number;
   tts_time_ms: number;
   boxes_passed: number;
@@ -32,6 +41,7 @@ interface TelemetryData {
   ocr_loaded: boolean;
   tts_loaded: boolean;
   capture_time_ms: number;
+  filter_time_ms: number;
   ocr_time_ms: number;
   tts_time_ms: number;
   engine_status: string;
@@ -71,13 +81,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const sliderVolume = document.getElementById("slider-volume") as HTMLInputElement;
   const valVolume = document.getElementById("val-volume") as HTMLSpanElement;
 
+  const sliderAutocorrectThreshold = document.getElementById("slider-autocorrect-threshold") as HTMLInputElement;
+  const valAutocorrectThreshold = document.getElementById("val-autocorrect-threshold") as HTMLSpanElement;
+
   const imgScanPreview = document.getElementById("img-scan-preview") as HTMLImageElement;
   const previewCropInfo = document.getElementById("preview-crop-info") as HTMLSpanElement;
   const activeTimestamp = document.getElementById("active-timestamp") as HTMLSpanElement;
+  const activeConfidence = document.getElementById("active-confidence") as HTMLSpanElement;
   const textCorrected = document.getElementById("text-corrected") as HTMLDivElement;
   const textRaw = document.getElementById("text-raw") as HTMLSpanElement;
 
   const metricCapTime = document.getElementById("metric-cap-time") as HTMLSpanElement;
+  const metricFilterTime = document.getElementById("metric-filter-time") as HTMLSpanElement;
   const metricOcrTime = document.getElementById("metric-ocr-time") as HTMLSpanElement;
   const metricTtsTime = document.getElementById("metric-tts-time") as HTMLSpanElement;
   const metricSpeed = document.getElementById("metric-speed") as HTMLSpanElement;
@@ -110,6 +125,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (chkTogglePreview) {
     chkTogglePreview.addEventListener("change", updatePreviewState);
+  }
+
+  if (sliderAutocorrectThreshold && valAutocorrectThreshold) {
+    sliderAutocorrectThreshold.addEventListener("input", () => {
+      const val = parseInt(sliderAutocorrectThreshold.value, 10);
+      valAutocorrectThreshold.textContent = `${val} %`;
+      invoke("set_autocorrect_threshold", { thresholdPct: val });
+    });
   }
 
   window.addEventListener("focus", () => {
@@ -247,9 +270,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   await listen<TelemetryData>("telemetry_update", (event) => {
     const data = event.payload;
 
-    metricCapTime.textContent = `${data.capture_time_ms.toFixed(1)} ms`;
-    metricOcrTime.textContent = `${data.ocr_time_ms.toFixed(1)} ms`;
-    metricTtsTime.textContent = `${data.tts_time_ms.toFixed(1)} ms`;
+    if (metricCapTime) metricCapTime.textContent = `${data.capture_time_ms.toFixed(1)} ms`;
+    if (metricFilterTime) metricFilterTime.textContent = `${data.filter_time_ms.toFixed(1)} ms`;
+    if (metricOcrTime) metricOcrTime.textContent = `${data.ocr_time_ms.toFixed(1)} ms`;
+    if (metricTtsTime) metricTtsTime.textContent = `${data.tts_time_ms.toFixed(1)} ms`;
 
     metricSpeed.textContent = `${data.effective_speed.toFixed(1)}x (${data.audio_queue_len} q)`;
 
@@ -283,24 +307,81 @@ document.addEventListener("DOMContentLoaded", async () => {
   await listen<SubtitleHistoryEntry>("ocr_result", (event) => {
     const entry = event.payload;
 
+    const confPct = Math.round(entry.confidence * 1000) / 10;
+
     activeTimestamp.textContent = entry.timestamp;
-    textCorrected.textContent = entry.corrected_text;
     textRaw.textContent = entry.raw_text;
 
-    metricCapTime.textContent = `${entry.capture_time_ms.toFixed(1)} ms`;
-    metricOcrTime.textContent = `${entry.ocr_time_ms.toFixed(1)} ms`;
-    metricTtsTime.textContent = `${entry.tts_time_ms.toFixed(1)} ms`;
+    // Render word chips with confidence sub-label in active subtitle box
+    if (entry.words && entry.words.length > 0) {
+      textCorrected.innerHTML = `
+        <div class="active-word-chips">
+          ${entry.words
+            .map((w) => {
+              const wConfPct = Math.round(w.confidence * 100);
+              const statusClass = w.is_corrected
+                ? "corrected"
+                : w.confidence >= 0.95
+                ? "high-conf"
+                : "low-conf";
+              return `
+                <span class="word-chip ${statusClass}">
+                  <span class="word-text">${escapeHtml(w.corrected)}</span>
+                  <sub class="word-sub-conf">${wConfPct}%</sub>
+                </span>
+              `;
+            })
+            .join("")}
+        </div>
+      `;
+    } else {
+      textCorrected.textContent = entry.corrected_text;
+    }
+
+    if (activeConfidence) {
+      activeConfidence.textContent = `Pewność: ${confPct}%`;
+      if (confPct >= 95) {
+        activeConfidence.style.background = "rgba(16, 185, 129, 0.15)";
+        activeConfidence.style.color = "#6ee7b7";
+        activeConfidence.style.borderColor = "rgba(16, 185, 129, 0.3)";
+      } else {
+        activeConfidence.style.background = "rgba(245, 158, 11, 0.15)";
+        activeConfidence.style.color = "#fcd34d";
+        activeConfidence.style.borderColor = "rgba(245, 158, 11, 0.3)";
+      }
+    }
+
+    if (metricCapTime) metricCapTime.textContent = `${entry.capture_time_ms.toFixed(1)} ms`;
+    if (metricFilterTime) metricFilterTime.textContent = `${entry.filter_time_ms.toFixed(1)} ms`;
+    if (metricOcrTime) metricOcrTime.textContent = `${entry.ocr_time_ms.toFixed(1)} ms`;
+    if (metricTtsTime) metricTtsTime.textContent = `${entry.tts_time_ms.toFixed(1)} ms`;
 
     const emptyRow = historyTbody.querySelector(".empty-row");
     if (emptyRow) {
       emptyRow.remove();
     }
 
+    // Format subtitle text for history row (showing strikethrough for low-confidence corrected words)
+    let formattedSubtitleHtml = "";
+    if (entry.words && entry.words.length > 0) {
+      formattedSubtitleHtml = entry.words
+        .map((w) => {
+          const wConfPct = Math.round(w.confidence * 100);
+          if (w.is_corrected) {
+            return `<del class="strikethrough-raw">${escapeHtml(w.raw)}</del><ins class="corrected-val">${escapeHtml(w.corrected)}</ins> <small class="word-conf-tag">(${wConfPct}%)</small>`;
+          } else {
+            return escapeHtml(w.corrected);
+          }
+        })
+        .join(" ");
+    } else {
+      formattedSubtitleHtml = escapeHtml(entry.corrected_text);
+    }
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="time-cell">${entry.timestamp}</td>
-      <td class="raw-text">${escapeHtml(entry.raw_text)}</td>
-      <td class="corr-text">${escapeHtml(entry.corrected_text)}</td>
+      <td class="corr-text">${formattedSubtitleHtml}</td>
       <td class="stats-tag">${Math.round(entry.capture_time_ms)}m/${Math.round(entry.ocr_time_ms)}m</td>
     `;
 

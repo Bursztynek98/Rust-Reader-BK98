@@ -40,6 +40,7 @@ pub struct FrameCaptureResult {
     pub filtered_image: DynamicImage,
     pub preview_base64: String,
     pub duration_ms: f64,
+    pub filter_duration_ms: f64,
 }
 
 /// Enumerate available system windows and display monitors.
@@ -114,7 +115,9 @@ pub fn capture_and_crop(
     let cropped_dyn = DynamicImage::ImageRgba8(cropped_sub.to_image());
 
     // Apply active multi-filter chain (padding, contrast, binarize, sharpen, upscale)
+    let filter_start = Instant::now();
     let filtered_dyn = apply_ocr_filters(&cropped_dyn, filters);
+    let filter_duration_ms = filter_start.elapsed().as_secs_f64() * 1000.0;
 
     let preview_base64 = if generate_preview {
         let preview_thumb = if filtered_dyn.width() > 520 {
@@ -139,6 +142,7 @@ pub fn capture_and_crop(
         filtered_image: filtered_dyn,
         preview_base64,
         duration_ms,
+        filter_duration_ms,
     })
 }
 

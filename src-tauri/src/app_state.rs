@@ -16,13 +16,23 @@ use crate::window_capture::{capture_and_crop, CropRegion};
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WordInfo {
+    pub raw: String,
+    pub corrected: String,
+    pub confidence: f32,
+    pub is_corrected: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleHistoryEntry {
     pub id: u64,
     pub timestamp: String,
     pub raw_text: String,
     pub corrected_text: String,
     pub confidence: f32,
+    pub words: Vec<WordInfo>,
     pub capture_time_ms: f64,
+    pub filter_time_ms: f64,
     pub ocr_time_ms: f64,
     pub tts_time_ms: f64,
     pub boxes_passed: usize,
@@ -42,6 +52,7 @@ pub struct TelemetryData {
     pub ocr_loaded: bool,
     pub tts_loaded: bool,
     pub capture_time_ms: f64,
+    pub filter_time_ms: f64,
     pub ocr_time_ms: f64,
     pub tts_time_ms: f64,
     pub engine_status: String,
@@ -51,6 +62,7 @@ pub struct AppState {
     pub is_paused: Arc<AtomicBool>,
     pub is_preview_enabled: Arc<AtomicBool>,
     pub scan_interval_ms: Arc<AtomicU64>,
+    pub autocorrect_threshold: Arc<Mutex<f32>>,
     pub target_id: Arc<Mutex<String>>,
     pub crop_region: Arc<Mutex<CropRegion>>,
     pub ocr_filters: Arc<Mutex<Vec<String>>>,
@@ -73,6 +85,7 @@ impl AppState {
         let is_paused = Arc::new(AtomicBool::new(true));
         let is_preview_enabled = Arc::new(AtomicBool::new(true));
         let scan_interval_ms = Arc::new(AtomicU64::new(300));
+        let autocorrect_threshold = Arc::new(Mutex::new(0.95f32));
         let target_id = Arc::new(Mutex::new("mon_0".to_string()));
         let crop_region = Arc::new(Mutex::new(CropRegion::default()));
         let ocr_filters = Arc::new(Mutex::new(vec!["padding20".to_string(), "contrast".to_string()]));
@@ -92,6 +105,7 @@ impl AppState {
             is_paused,
             is_preview_enabled,
             scan_interval_ms,
+            autocorrect_threshold,
             target_id,
             crop_region,
             ocr_filters,
@@ -146,6 +160,7 @@ impl AppState {
         thread::spawn(move || {
             let mut entry_counter = 0u64;
             let mut last_cap_time = 0.0f64;
+            let mut last_filter_time = 0.0f64;
             let mut last_ocr_time = 0.0f64;
             let mut last_tts_time = 0.0f64;
 
@@ -165,6 +180,7 @@ impl AppState {
                 // Capture frame, crop, apply active multi-filters & emit live preview Data URI if enabled
                 if let Ok(frame_res) = capture_and_crop(&target, &crop, &active_filters, is_preview_active) {
                     last_cap_time = frame_res.duration_ms;
+                    last_filter_time = frame_res.filter_duration_ms;
 
                     if is_preview_active && !frame_res.preview_base64.is_empty() {
                         let _ = app_handle.emit("scan_preview", serde_json::json!({
@@ -178,7 +194,8 @@ impl AppState {
                             last_frame_hash = Some(new_hash);
                             let ocr_guard = state.ocr_engine.lock();
                             if let Some(ref ocr) = *ocr_guard {
-                                if let Ok(ocr_res) = ocr.process_image(&frame_res.filtered_image) {
+                                let threshold = *state.autocorrect_threshold.lock();
+                                if let Ok(ocr_res) = ocr.process_image(&frame_res.filtered_image, threshold) {
                                     last_ocr_time = ocr_res.duration_ms;
                                     let now_str = chrono_now_str();
 
@@ -221,7 +238,9 @@ impl AppState {
                                             raw_text: ocr_res.raw_text,
                                             corrected_text: ocr_res.corrected_text,
                                             confidence: ocr_res.confidence,
+                                            words: ocr_res.words,
                                             capture_time_ms: last_cap_time,
+                                            filter_time_ms: last_filter_time,
                                             ocr_time_ms: last_ocr_time,
                                             tts_time_ms: last_tts_time,
                                             boxes_passed: ocr_res.boxes_passed,
@@ -262,6 +281,7 @@ impl AppState {
                     ocr_loaded: is_ocr_ready,
                     tts_loaded: is_tts_ready,
                     capture_time_ms: last_cap_time,
+                    filter_time_ms: last_filter_time,
                     ocr_time_ms: last_ocr_time,
                     tts_time_ms: last_tts_time,
                     engine_status: current_status,

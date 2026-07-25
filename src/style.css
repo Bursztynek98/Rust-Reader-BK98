@@ -587,9 +587,9 @@ input[type="range"] {
 /* FIXED TABLE LAYOUT PREVENTS HORIZONTAL OVERFLOW */
 .history-table {
   width: 100%;
-  table-layout: inherit;
+  table-layout: fixed;
   border-collapse: collapse;
-  font-size: 10px;
+  font-size: 11px;
   text-align: left;
 }
 
@@ -597,22 +597,19 @@ input[type="range"] {
   position: sticky;
   top: 0;
   background: rgba(18, 22, 34, 0.95);
-  padding: 6px 6px;
+  padding: 6px 8px;
   color: var(--text-muted);
   font-weight: 600;
   border-bottom: 1px solid var(--border-card);
-
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .history-table td {
-  padding: 6px 6px;
+  padding: 6px 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   vertical-align: top;
+  word-wrap: break-word;
   word-break: break-word;
-  overflow: hidden;
 }
 
 .history-table tr:hover {
@@ -620,20 +617,76 @@ input[type="range"] {
 }
 
 .col-time {
-  width: 54px;
+  width: 62px;
 }
 
-.col-raw {
-  width: 38%;
-}
-
-.col-corr {
-  width: 42%;
+.col-text {
+  width: auto;
 }
 
 .col-stats {
-  width: 46px;
+  width: 72px;
   text-align: right;
+}
+
+/* WORD CHIPS & STRIKETHROUGH */
+.active-word-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-height: 44px;
+}
+
+.word-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.word-chip .word-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.word-chip .word-sub-conf {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.word-chip.high-conf .word-sub-conf {
+  color: #6ee7b7;
+}
+
+.word-chip.low-conf .word-sub-conf {
+  color: #f59e0b;
+}
+
+.word-chip.corrected .word-sub-conf {
+  color: #f43f5e;
+}
+
+.strikethrough-raw {
+  text-decoration: line-through;
+  color: #f43f5e;
+  opacity: 0.85;
+  margin-right: 3px;
+}
+
+.corrected-val {
+  color: #6ee7b7;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.word-conf-tag {
+  font-size: 9px;
+  color: #f59e0b;
+  font-family: var(--font-mono);
 }
 
 .empty-row td {
