@@ -5,6 +5,12 @@
 </div>
 
 ---
+## Wygląd aplikacji
+<div style="text-align: center;">
+  <img src="./2026-07-26%20194600.png" width="720" style="border: 2px solid #333; padding: 5px; display: inline-block;">
+</div>
+
+---
 
 ## 📸 Omówienie Projektu
 
