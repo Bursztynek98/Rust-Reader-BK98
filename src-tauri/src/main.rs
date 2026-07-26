@@ -9,7 +9,7 @@ mod ocr_engine;
 mod tts_engine;
 mod window_capture;
 
-use app_state::{AppState, SubtitleHistoryEntry};
+use app_state::AppState;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tauri::State;
@@ -120,11 +120,6 @@ fn set_word_reject_threshold(state: State<'_, Arc<AppState>>, threshold_pct: f32
     Ok(())
 }
 
-#[tauri::command]
-fn get_history(state: State<'_, Arc<AppState>>) -> Result<Vec<SubtitleHistoryEntry>, String> {
-    Ok(state.history.lock().clone())
-}
-
 fn main() {
     let app_state = Arc::new(AppState::new());
     let state_for_worker = Arc::clone(&app_state);
@@ -147,8 +142,7 @@ fn main() {
             set_tts_voice,
             set_tts_speed,
             set_tts_volume,
-            toggle_pause,
-            get_history
+            toggle_pause
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -52,6 +52,12 @@ impl AudioPlayer {
                         pending_queue.push(item);
                     }
 
+                    // Cap pending audio queue to max 10 items to prevent PCM buffer RAM accumulation
+                    if pending_queue.len() > 10 {
+                        let to_remove = pending_queue.len() - 10;
+                        pending_queue.drain(..to_remove);
+                    }
+
                     // Update queue length metric
                     {
                         let mut q = qlen_clone.lock();

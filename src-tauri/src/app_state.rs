@@ -71,7 +71,6 @@ pub struct AppState {
     pub tts_speed: Arc<Mutex<f32>>,
     pub tts_volume: Arc<Mutex<f32>>,
     pub last_spoken_text: Arc<Mutex<String>>,
-    pub history: Arc<Mutex<Vec<SubtitleHistoryEntry>>>,
 
     pub ocr_loaded: Arc<AtomicBool>,
     pub tts_loaded: Arc<AtomicBool>,
@@ -95,7 +94,6 @@ impl AppState {
         let tts_speed = Arc::new(Mutex::new(1.0f32));
         let tts_volume = Arc::new(Mutex::new(1.0f32));
         let last_spoken_text = Arc::new(Mutex::new(String::new()));
-        let history = Arc::new(Mutex::new(Vec::new()));
         let engine_status = Arc::new(Mutex::new("Inicjalizacja silników...".to_string()));
 
         let ocr_loaded = Arc::new(AtomicBool::new(false));
@@ -116,7 +114,6 @@ impl AppState {
             tts_speed,
             tts_volume,
             last_spoken_text,
-            history,
             ocr_loaded,
             tts_loaded,
             ocr_engine: Arc::new(Mutex::new(None)),
@@ -252,7 +249,6 @@ impl AppState {
                                             status: "SPOKEN".to_string(),
                                         };
 
-                                        state.history.lock().push(entry.clone());
                                         let _ = app_handle.emit("ocr_result", entry);
                                     }
                                 }

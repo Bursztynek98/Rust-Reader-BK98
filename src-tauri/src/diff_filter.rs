@@ -8,34 +8,44 @@ const MIN_TEXT_LENGTH: usize = 3;
 
 /// Normalize text: lowercase, apply OCR misread character mapping, collapse whitespace.
 pub fn normalize_text(text: &str) -> String {
-    let mut text = text.to_lowercase();
-    
-    // Replace common misread ASCII chars with Polish/Latin equivalents
-    let norm_map = [
-        ('$', 'ś'),
-        ('§', 'ś'),
-        ('^', 'ą'),
-        ('~', 'ż'),
-        ('#', 'ń'),
-        ('@', 'ę'),
-        ('&', 'ź'),
-        ('|', 'l'),
-        ('!', 'i'),
-        ('0', 'o'),
-        ('1', 'l'),
-        ('3', 'e'),
-        ('4', 'a'),
-        ('5', 's'),
-        ('8', 'b'),
-    ];
+    let mut normalized = String::with_capacity(text.len());
+    let mut in_whitespace = false;
 
-    for (src, dst) in norm_map {
-        text = text.replace(src, &dst.to_string());
+    for ch in text.chars() {
+        let lower = ch.to_lowercase().next().unwrap_or(ch);
+        let mapped = match lower {
+            '$' | '§' => 'ś',
+            '^' => 'ą',
+            '~' => 'ż',
+            '#' => 'ń',
+            '@' => 'ę',
+            '&' => 'ź',
+            '|' | '1' => 'l',
+            '!' => 'i',
+            '0' => 'o',
+            '3' => 'e',
+            '4' => 'a',
+            '5' => 's',
+            '8' => 'b',
+            c => c,
+        };
+
+        if mapped.is_whitespace() {
+            if !in_whitespace && !normalized.is_empty() {
+                normalized.push(' ');
+                in_whitespace = true;
+            }
+        } else {
+            normalized.push(mapped);
+            in_whitespace = false;
+        }
     }
 
-    // Collapse whitespace
-    let words: Vec<&str> = text.split_whitespace().collect();
-    words.join(" ")
+    if normalized.ends_with(' ') {
+        normalized.pop();
+    }
+
+    normalized
 }
 
 /// Calculate Levenshtein similarity ratio between two strings:
