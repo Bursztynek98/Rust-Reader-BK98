@@ -134,8 +134,9 @@ pub fn has_image_changed(prev_hash: Option<FrameHash>, current_img: &image::Dyna
         .map(|(&a, &b)| (a ^ b).count_ones())
         .sum();
 
-    // If Hamming distance > 6 bits out of 256 (~2.3% difference), image has changed
-    (diff_bits > 6, current_hash)
+    // Sensitive frame change detection: Hamming distance >= 2 bits out of 256 (~0.7% change)
+    // Ensures small subtitle text changes on solid dark/black background banners are detected.
+    (diff_bits >= 2, current_hash)
 }
 
 #[cfg(test)]

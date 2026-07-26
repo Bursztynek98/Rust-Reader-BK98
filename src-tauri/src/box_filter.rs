@@ -10,8 +10,8 @@ pub fn is_valid_box_size(w: u32, h: u32, _frame_w: u32, frame_h: u32) -> bool {
 
     // Filter giant full-screen artifact boxes (> 92% frame height)
     let max_h = (frame_h as f32 * 0.92) as u32;
-    if h > max_h {
-        return false;
+        if h > max_h {
+            return false;
     }
 
     true
@@ -48,17 +48,17 @@ pub fn is_clean_text(text: &str) -> bool {
         return false;
     }
 
-    // 2. Reject if non-allowed characters (Chinese, Cyrillic, OCR garbage symbols) exceed 10%
+    // 2. Reject if non-allowed characters (Chinese, Cyrillic, OCR garbage symbols) exceed 25%
     let total_chars = trimmed.chars().count();
     let invalid_chars = trimmed.chars().filter(|&c| !is_allowed_char(c)).count();
-    if invalid_chars > 0 && (invalid_chars as f32 / total_chars as f32) > 0.10 {
+    if invalid_chars > 0 && (invalid_chars as f32 / total_chars as f32) > 0.25 {
         return false;
     }
 
     // 3. Reject repetitive single character spam (e.g. "aaaaa", "|||||", ".....")
     let clean_sanitized = sanitize_text(trimmed);
     let clean_trimmed = clean_sanitized.trim();
-    if clean_trimmed.len() > 1 {
+    if clean_trimmed.len() > 2 {
         let first_char = clean_trimmed.chars().next().unwrap();
         if clean_trimmed.chars().all(|c| c == first_char) {
             return false;
