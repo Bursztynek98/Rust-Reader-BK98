@@ -24,6 +24,12 @@ pub struct VoiceDefinition {
 
 pub const VOICES: &[VoiceDefinition] = &[
     VoiceDefinition {
+        key: "piper_jarvis",
+        name: "Polski głos Jarvis (Piper VITS)",
+        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-jarvis_wg_glos-medium.tar.bz2",
+        is_supertonic: false,
+    },
+    VoiceDefinition {
         key: "piper_zenski",
         name: "Polski głos żeński (Piper VITS)",
         url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-zenski_wg_glos-medium.tar.bz2",
@@ -36,9 +42,33 @@ pub const VOICES: &[VoiceDefinition] = &[
         is_supertonic: false,
     },
     VoiceDefinition {
-        key: "piper_jarvis",
-        name: "Polski głos Jarvis (Piper VITS)",
-        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-jarvis_wg_glos-medium.tar.bz2",
+        key: "piper_gosia",
+        name: "Polski głos Gosia (Piper VITS)",
+        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-gosia-medium.tar.bz2",
+        is_supertonic: false,
+    },
+    VoiceDefinition {
+        key: "piper_justyna",
+        name: "Polski głos Justyna (Piper VITS)",
+        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-justyna_wg_glos-medium.tar.bz2",
+        is_supertonic: false,
+    },
+    VoiceDefinition {
+        key: "piper_darkman",
+        name: "Polski głos Darkman (Piper VITS)",
+        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-darkman-medium.tar.bz2",
+        is_supertonic: false,
+    },
+    VoiceDefinition {
+        key: "piper_bass",
+        name: "Polski głos Bass (Piper VITS High)",
+        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-bass-high.tar.bz2",
+        is_supertonic: false,
+    },
+    VoiceDefinition {
+        key: "piper_mc_speech",
+        name: "Polski głos MC Speech (Piper VITS)",
+        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-mc_speech-medium.tar.bz2",
         is_supertonic: false,
     },
     VoiceDefinition {

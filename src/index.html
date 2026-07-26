@@ -122,95 +122,6 @@
 
           <hr class="divider" />
 
-          <!-- CROP REGION (BOX MODEL UI) -->
-          <h3 class="subsection-title">✂️ Obszar Kadrowania (Box Model)</h3>
-          
-          <!-- VISUAL CROP BOX MODEL DIAGRAM -->
-          <div class="crop-box-model" id="crop-box-model">
-            <div class="crop-target-frame">
-              <!-- Top Cut Overlay -->
-              <div class="crop-cut-overlay cut-top" id="box-overlay-top">
-                <span class="crop-edge-label">GÓRA: <strong id="box-val-top">80%</strong></span>
-              </div>
-
-              <!-- Bottom Cut Overlay -->
-              <div class="crop-cut-overlay cut-bottom" id="box-overlay-bottom">
-                <span class="crop-edge-label">DÓŁ: <strong id="box-val-bottom">0%</strong></span>
-              </div>
-
-              <!-- Left Cut Overlay -->
-              <div class="crop-cut-overlay cut-left" id="box-overlay-left">
-                <span class="crop-edge-label">LEWO: <strong id="box-val-left">0%</strong></span>
-              </div>
-
-              <!-- Right Cut Overlay -->
-              <div class="crop-cut-overlay cut-right" id="box-overlay-right">
-                <span class="crop-edge-label">PRAWO: <strong id="box-val-right">0%</strong></span>
-              </div>
-
-              <!-- Active Kadr Box (Content Area) -->
-              <div class="crop-active-box" id="box-active-kadr">
-                <div class="crop-active-badge">
-                  <span class="badge-title">KADR OCR</span>
-                  <span class="badge-dims" id="box-active-dims">100% × 20%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- QUICK PRESETS -->
-          <div class="crop-presets">
-            <button type="button" class="preset-btn" data-top="80" data-bottom="0" data-left="0" data-right="0">
-              🎬 Napisy dół (80/0/0/0)
-            </button>
-            <button type="button" class="preset-btn" data-top="80" data-bottom="10" data-left="20" data-right="20">
-              💬 Przykład (80/10/20/20)
-            </button>
-            <button type="button" class="preset-btn" data-top="25" data-bottom="25" data-left="20" data-right="20">
-              🎯 Środek (25/25/20/20)
-            </button>
-            <button type="button" class="preset-btn" data-top="0" data-bottom="0" data-left="0" data-right="0">
-              🖼️ Całość (0/0/0/0)
-            </button>
-          </div>
-
-          <!-- MARGIN CUT SLIDERS -->
-          <div class="crop-sliders-grid">
-            <div class="control-group compact">
-              <div class="control-label-row">
-                <label for="slider-crop-cut-top">⬆️ Od Góry:</label>
-                <span id="val-crop-cut-top" class="val-badge badge-accent">80 %</span>
-              </div>
-              <input type="range" id="slider-crop-cut-top" min="0" max="90" step="1" value="80" />
-            </div>
-
-            <div class="control-group compact">
-              <div class="control-label-row">
-                <label for="slider-crop-cut-bottom">⬇️ Od Dołu:</label>
-                <span id="val-crop-cut-bottom" class="val-badge badge-accent">0 %</span>
-              </div>
-              <input type="range" id="slider-crop-cut-bottom" min="0" max="90" step="1" value="0" />
-            </div>
-
-            <div class="control-group compact">
-              <div class="control-label-row">
-                <label for="slider-crop-cut-left">⬅️ Od Lewej:</label>
-                <span id="val-crop-cut-left" class="val-badge badge-accent">0 %</span>
-              </div>
-              <input type="range" id="slider-crop-cut-left" min="0" max="90" step="1" value="0" />
-            </div>
-
-            <div class="control-group compact">
-              <div class="control-label-row">
-                <label for="slider-crop-cut-right">➡️ Od Prawej:</label>
-                <span id="val-crop-cut-right" class="val-badge badge-accent">0 %</span>
-              </div>
-              <input type="range" id="slider-crop-cut-right" min="0" max="90" step="1" value="0" />
-            </div>
-          </div>
-
-          <hr class="divider" />
-
           <!-- TTS VOICE & AUDIO -->
           <h3 class="subsection-title">🗣️ Synteza Mowy (TTS)</h3>
 
@@ -220,6 +131,11 @@
               <option value="piper_jarvis" selected>Polski Jarvis (Piper VITS)</option>
               <option value="piper_zenski">Polski żeński (Piper VITS)</option>
               <option value="piper_meski">Polski męski (Piper VITS)</option>
+              <option value="piper_gosia">Polski Gosia (Piper VITS)</option>
+              <option value="piper_justyna">Polski Justyna (Piper VITS)</option>
+              <option value="piper_darkman">Polski Darkman (Piper VITS)</option>
+              <option value="piper_bass">Polski Bass (Piper VITS High)</option>
+              <option value="piper_mc_speech">Polski MC Speech (Piper VITS)</option>
               <option value="supertonic">Supertonic 3 (Multilingual)</option>
             </select>
           </div>
@@ -241,10 +157,10 @@
           </div>
         </section>
 
-        <!-- MIDDLE COLUMN: SCAN PREVIEW & ACTIVE SUBTITLE -->
+        <!-- MIDDLE COLUMN: SCAN PREVIEW, CROP & ACTIVE SUBTITLE -->
         <section class="card panel-preview">
-          <div class="section-title-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-            <h2 class="section-title" style="margin-bottom: 0;">📺 Podgląd Kadru</h2>
+          <div class="section-title-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+            <h2 class="section-title" style="margin-bottom: 0;">📺 Podgląd Kadru &amp; Kadrowanie</h2>
             <label class="checkbox-label" style="font-size: 0.82rem; color: #a1a1aa; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;">
               <input type="checkbox" id="chk-toggle-preview" checked />
               <span>Podgląd na żywo (Auto-pauza w tle)</span>
@@ -268,6 +184,93 @@
             <div class="preview-overlay">
               <span id="live-tag" class="live-tag">LIVE SCAN</span>
               <span id="preview-crop-info">Obszar: Bottom 20%</span>
+            </div>
+          </div>
+
+          <!-- CROP REGION (BOX MODEL UI IN MIDDLE PANEL) -->
+          <div class="crop-middle-card">
+            <h3 class="subsection-title" style="margin-bottom: 6px;">✂️ Obszar Kadrowania (Box Model)</h3>
+            <div class="crop-two-col-layout">
+              <!-- Left Sub-Column: Visual Box Model -->
+              <div class="crop-visual-col">
+                <div class="crop-box-model" id="crop-box-model">
+                  <div class="crop-target-frame">
+                    <div class="crop-cut-overlay cut-top" id="box-overlay-top">
+                      <span class="crop-edge-label">GÓRA: <strong id="box-val-top">80%</strong></span>
+                    </div>
+                    <div class="crop-cut-overlay cut-bottom" id="box-overlay-bottom">
+                      <span class="crop-edge-label">DÓŁ: <strong id="box-val-bottom">0%</strong></span>
+                    </div>
+                    <div class="crop-cut-overlay cut-left" id="box-overlay-left">
+                      <span class="crop-edge-label">LEWO: <strong id="box-val-left">0%</strong></span>
+                    </div>
+                    <div class="crop-cut-overlay cut-right" id="box-overlay-right">
+                      <span class="crop-edge-label">PRAWO: <strong id="box-val-right">0%</strong></span>
+                    </div>
+                    <div class="crop-active-box" id="box-active-kadr">
+                      <div class="crop-active-badge">
+                        <span class="badge-title">KADR OCR</span>
+                        <span class="badge-dims" id="box-active-dims">100% × 20%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Sub-Column: Presets & Sliders -->
+              <div class="crop-sliders-col">
+                <div class="crop-presets">
+                  <button type="button" class="preset-btn" data-top="80" data-bottom="0" data-left="0" data-right="0">
+                    🎬 Napisy dół (80/0/0/0)
+                  </button>
+                  <button type="button" class="preset-btn" data-top="80" data-bottom="10" data-left="20" data-right="20">
+                    💬 Preset 1 (80/10/20/20)
+                  </button>
+                  <button type="button" class="preset-btn" data-top="80" data-bottom="0" data-left="20" data-right="20">
+                    📺 Preset 2 (80/0/20/20)
+                  </button>
+                  <button type="button" class="preset-btn" data-top="25" data-bottom="25" data-left="20" data-right="20">
+                    🎯 Środek (25/25/20/20)
+                  </button>
+                  <button type="button" class="preset-btn" data-top="0" data-bottom="0" data-left="0" data-right="0">
+                    🖼️ Całość (0/0/0/0)
+                  </button>
+                </div>
+
+                <div class="crop-sliders-grid">
+                  <div class="control-group compact">
+                    <div class="control-label-row">
+                      <label for="slider-crop-cut-top">⬆️ Od Góry:</label>
+                      <span id="val-crop-cut-top" class="val-badge badge-accent">80 %</span>
+                    </div>
+                    <input type="range" id="slider-crop-cut-top" min="0" max="95" step="1" value="80" />
+                  </div>
+
+                  <div class="control-group compact">
+                    <div class="control-label-row">
+                      <label for="slider-crop-cut-bottom">⬇️ Od Dołu:</label>
+                      <span id="val-crop-cut-bottom" class="val-badge badge-accent">0 %</span>
+                    </div>
+                    <input type="range" id="slider-crop-cut-bottom" min="0" max="95" step="1" value="0" />
+                  </div>
+
+                  <div class="control-group compact">
+                    <div class="control-label-row">
+                      <label for="slider-crop-cut-left">⬅️ Od Lewej:</label>
+                      <span id="val-crop-cut-left" class="val-badge badge-accent">0 %</span>
+                    </div>
+                    <input type="range" id="slider-crop-cut-left" min="0" max="95" step="1" value="0" />
+                  </div>
+
+                  <div class="control-group compact">
+                    <div class="control-label-row">
+                      <label for="slider-crop-cut-right">➡️ Od Prawej:</label>
+                      <span id="val-crop-cut-right" class="val-badge badge-accent">0 %</span>
+                    </div>
+                    <input type="range" id="slider-crop-cut-right" min="0" max="95" step="1" value="0" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
