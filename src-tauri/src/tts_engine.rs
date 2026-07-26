@@ -145,7 +145,7 @@ pub fn is_voice_downloaded(model_dir: &Path) -> bool {
 pub struct GeneratedAudio {
     pub samples: Vec<f32>,
     pub sample_rate: u32,
-    pub duration_ms: f64,
+    pub duration_ms: f32,
 }
 
 pub struct TtsEngine {
@@ -271,7 +271,7 @@ impl TtsEngine {
         let audio = tts
             .generate_with_config(text, &gen_config, None::<fn(&[f32], f32) -> bool>)
             .ok_or_else(|| anyhow!("TTS audio synthesis failed"))?;
-        let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+        let duration_ms = start.elapsed().as_secs_f32() * 1000.0;
 
         Ok(GeneratedAudio {
             samples: audio.samples().to_vec(),

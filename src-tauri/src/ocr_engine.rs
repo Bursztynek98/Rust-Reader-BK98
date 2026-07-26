@@ -18,7 +18,7 @@ pub struct OcrResult {
     pub corrected_text: String,
     pub confidence: f32,
     pub words: Vec<WordInfo>,
-    pub duration_ms: f64,
+    pub duration_ms: f32,
 }
 
 pub struct OcrEngine {
@@ -92,7 +92,7 @@ impl OcrEngine {
             .predict(vec![rgb_img])
             .map_err(|e| anyhow!("OCR prediction failed: {:?}", e))?;
 
-        let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+        let duration_ms = start.elapsed().as_secs_f32() * 1000.0;
 
         let mut raw_parts = Vec::new();
         let mut corrected_parts = Vec::new();

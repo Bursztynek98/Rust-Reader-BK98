@@ -2,7 +2,7 @@
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -25,21 +25,21 @@ pub struct WordInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubtitleHistoryEntry {
-    pub id: u64,
+    pub id: u32,
     pub timestamp: String,
     pub raw_text: String,
     pub corrected_text: String,
     pub confidence: f32,
     pub words: Vec<WordInfo>,
-    pub capture_time_ms: f64,
-    pub filter_time_ms: f64,
-    pub ocr_time_ms: f64,
-    pub tts_time_ms: f64,
+    pub capture_time_ms: f32,
+    pub filter_time_ms: f32,
+    pub ocr_time_ms: f32,
+    pub tts_time_ms: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelemetryData {
-    pub scan_interval_ms: u64,
+    pub scan_interval_ms: u16,
     pub is_paused: bool,
     pub audio_queue_len: usize,
     pub current_voice: String,
@@ -48,16 +48,16 @@ pub struct TelemetryData {
     pub volume: f32,
     pub ocr_loaded: bool,
     pub tts_loaded: bool,
-    pub capture_time_ms: f64,
-    pub filter_time_ms: f64,
-    pub ocr_time_ms: f64,
-    pub tts_time_ms: f64,
+    pub capture_time_ms: f32,
+    pub filter_time_ms: f32,
+    pub ocr_time_ms: f32,
+    pub tts_time_ms: f32,
 }
 
 pub struct AppState {
     pub is_paused: Arc<AtomicBool>,
     pub is_preview_enabled: Arc<AtomicBool>,
-    pub scan_interval_ms: Arc<AtomicU64>,
+    pub scan_interval_ms: Arc<AtomicU16>,
     pub autocorrect_threshold: Arc<Mutex<f32>>,
     pub word_reject_threshold: Arc<Mutex<f32>>,
     pub frame_diff_threshold: Arc<Mutex<u8>>,
@@ -80,7 +80,7 @@ impl AppState {
     pub fn new() -> Self {
         let is_paused = Arc::new(AtomicBool::new(true));
         let is_preview_enabled = Arc::new(AtomicBool::new(true));
-        let scan_interval_ms = Arc::new(AtomicU64::new(300));
+        let scan_interval_ms = Arc::new(AtomicU16::new(300));
         let autocorrect_threshold = Arc::new(Mutex::new(0.95f32));
         let word_reject_threshold = Arc::new(Mutex::new(0.40f32));
         let frame_diff_threshold = Arc::new(Mutex::new(2u8));
@@ -152,11 +152,11 @@ impl AppState {
         // 2. Frame Capture & Subtitle Processing Loop
         let state = Arc::clone(self);
         thread::spawn(move || {
-            let mut entry_counter = 0u64;
-            let mut last_cap_time = 0.0f64;
-            let mut last_filter_time = 0.0f64;
-            let mut last_ocr_time = 0.0f64;
-            let mut last_tts_time = 0.0f64;
+            let mut entry_counter = 0u32;
+            let mut last_cap_time = 0.0f32;
+            let mut last_filter_time = 0.0f32;
+            let mut last_ocr_time = 0.0f32;
+            let mut last_tts_time = 0.0f32;
 
             let mut last_frame_hash: Option<FrameHash> = None;
 
@@ -269,7 +269,7 @@ impl AppState {
                     tts_time_ms: last_tts_time,
                 });
 
-                thread::sleep(Duration::from_millis(interval));
+                thread::sleep(Duration::from_millis(u64::from(interval)));
             }
         });
     }

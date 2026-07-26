@@ -49,7 +49,7 @@ fn set_ocr_filters(state: State<'_, Arc<AppState>>, filters: Vec<String>) -> Res
 }
 
 #[tauri::command]
-fn set_scan_interval(state: State<'_, Arc<AppState>>, interval_ms: u64) -> Result<(), String> {
+fn set_scan_interval(state: State<'_, Arc<AppState>>, interval_ms: u16) -> Result<(), String> {
     let interval_ms = interval_ms.clamp(100, 1000);
     state.scan_interval_ms.store(interval_ms, Ordering::Relaxed);
     Ok(())
