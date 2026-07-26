@@ -72,6 +72,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const sliderInterval = document.getElementById("slider-interval") as HTMLInputElement;
   const valInterval = document.getElementById("val-interval") as HTMLSpanElement;
 
+  const sliderFrameDiffThreshold = document.getElementById("slider-frame-diff-threshold") as HTMLInputElement;
+  const valFrameDiffThreshold = document.getElementById("val-frame-diff-threshold") as HTMLSpanElement;
+
   const chkOcrFilters = document.querySelectorAll<HTMLInputElement>(".chk-ocr-filter");
 
   const sliderCropCutTop = document.getElementById("slider-crop-cut-top") as HTMLInputElement;
@@ -319,12 +322,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Initial update of crop Box Model visual state
   updateCropParams();
 
-  // 3. Scan Interval & OCR Multi-Filter Checkboxes
+  // 3. Scan Interval & Frame Diff Threshold & OCR Multi-Filter Checkboxes
   sliderInterval.addEventListener("input", () => {
     const val = parseInt(sliderInterval.value, 10);
     valInterval.textContent = `${val} ms`;
     invoke("set_scan_interval", { intervalMs: val });
   });
+
+  if (sliderFrameDiffThreshold) {
+    sliderFrameDiffThreshold.addEventListener("input", () => {
+      const val = parseInt(sliderFrameDiffThreshold.value, 10);
+      let label = `${val} bit`;
+      if (val === 0) label = "0 (Wyłączone - Skanuj każdą)";
+      else if (val === 1) label = "1 (Ultra czuły - Czarny ekran)";
+      else if (val === 2) label = "2 (Domyślnie wysoka)";
+      else if (val >= 5) label = `${val} (Niska czułość)`;
+
+      if (valFrameDiffThreshold) valFrameDiffThreshold.textContent = label;
+      invoke("set_frame_diff_threshold", { threshold: val });
+    });
+  }
 
   function updateActiveFilters() {
     const activeFilters: string[] = [];

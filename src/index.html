@@ -63,6 +63,21 @@
             </div>
           </div>
 
+          <!-- FRAME DIFF SENSITIVITY THRESHOLD -->
+          <div class="control-group" style="margin-top: 6px;">
+            <div class="control-label-row">
+              <label for="slider-frame-diff-threshold">Czułość Różnicy Klatek (Diff):</label>
+              <span id="val-frame-diff-threshold" class="val-badge">2 (Wysoka - Domyślna)</span>
+            </div>
+            <input type="range" id="slider-frame-diff-threshold" min="0" max="10" step="1" value="2" />
+            <div class="slider-ticks">
+              <span>0 (Zawsze skanuj)</span>
+              <span>1 (Ultra czuły)</span>
+              <span>2 (Domyślnie)</span>
+              <span>5+ (Niska)</span>
+            </div>
+          </div>
+
           <!-- AUTOCORRECT & NOISE REJECTION THRESHOLDS -->
           <h3 class="subsection-title">🪄 Auto-Korekta &amp; Filtrowanie Szumów</h3>
           <div class="control-group">

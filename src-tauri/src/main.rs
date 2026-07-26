@@ -166,6 +166,13 @@ fn set_word_reject_threshold(state: State<'_, Arc<AppState>>, threshold_pct: f32
     Ok(())
 }
 
+#[tauri::command]
+fn set_frame_diff_threshold(state: State<'_, Arc<AppState>>, threshold: u8) -> Result<(), String> {
+    let threshold = threshold.clamp(0, 20);
+    *state.frame_diff_threshold.lock() = threshold;
+    Ok(())
+}
+
 fn main() {
     let app_state = Arc::new(AppState::new());
     let state_for_worker = Arc::clone(&app_state);
@@ -185,6 +192,7 @@ fn main() {
             set_preview_enabled,
             set_autocorrect_threshold,
             set_word_reject_threshold,
+            set_frame_diff_threshold,
             get_tts_voices,
             set_tts_voice,
             set_tts_speed,

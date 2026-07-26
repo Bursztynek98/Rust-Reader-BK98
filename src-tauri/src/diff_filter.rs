@@ -122,21 +122,24 @@ pub fn compute_frame_hash(img: &image::DynamicImage) -> FrameHash {
 }
 
 /// Returns true if the captured image changed significantly compared to `prev_hash`.
-pub fn has_image_changed(prev_hash: Option<FrameHash>, current_img: &image::DynamicImage) -> (bool, FrameHash) {
+/// `threshold`: Hamming distance bit threshold (0..=20). If 0, returns true (always scan every frame).
+pub fn has_image_changed(prev_hash: Option<FrameHash>, current_img: &image::DynamicImage, threshold: u8) -> (bool, FrameHash) {
     let current_hash = compute_frame_hash(current_img);
+    if threshold == 0 {
+        return (true, current_hash);
+    }
+
     let prev = match prev_hash {
         Some(h) => h,
         None => return (true, current_hash),
     };
 
-    let diff_bits: u32 = prev.iter()
+    let diff_bits: u8 = prev.iter()
         .zip(current_hash.iter())
-        .map(|(&a, &b)| (a ^ b).count_ones())
+        .map(|(&a, &b)| (a ^ b).count_ones() as u8)
         .sum();
 
-    // Sensitive frame change detection: Hamming distance >= 2 bits out of 256 (~0.7% change)
-    // Ensures small subtitle text changes on solid dark/black background banners are detected.
-    (diff_bits >= 2, current_hash)
+    (diff_bits >= threshold, current_hash)
 }
 
 #[cfg(test)]
@@ -163,5 +166,16 @@ mod tests {
     #[test]
     fn test_new_subtitle() {
         assert!(has_significant_change("Cześć jak się masz?", "Gdzie idziemy jutro rano?"));
+    }
+
+    #[test]
+    fn test_image_changed_threshold() {
+        let img1 = image::DynamicImage::new_rgb8(100, 100);
+        let img2 = image::DynamicImage::new_rgb8(100, 100);
+        let (changed_0, h1) = has_image_changed(None, &img1, 0);
+        assert!(changed_0);
+
+        let (changed_0_subsequent, _) = has_image_changed(Some(h1), &img2, 0);
+        assert!(changed_0_subsequent);
     }
 }

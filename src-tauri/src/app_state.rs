@@ -60,6 +60,7 @@ pub struct AppState {
     pub scan_interval_ms: Arc<AtomicU64>,
     pub autocorrect_threshold: Arc<Mutex<f32>>,
     pub word_reject_threshold: Arc<Mutex<f32>>,
+    pub frame_diff_threshold: Arc<Mutex<u8>>,
     pub target_id: Arc<Mutex<String>>,
     pub crop_region: Arc<Mutex<CropRegion>>,
     pub ocr_filters: Arc<Mutex<Vec<String>>>,
@@ -82,6 +83,7 @@ impl AppState {
         let scan_interval_ms = Arc::new(AtomicU64::new(300));
         let autocorrect_threshold = Arc::new(Mutex::new(0.95f32));
         let word_reject_threshold = Arc::new(Mutex::new(0.40f32));
+        let frame_diff_threshold = Arc::new(Mutex::new(2u8));
         let target_id = Arc::new(Mutex::new("mon_0".to_string()));
         let crop_region = Arc::new(Mutex::new(CropRegion::default()));
         let ocr_filters = Arc::new(Mutex::new(vec!["padding20".to_string(), "contrast".to_string()]));
@@ -101,6 +103,7 @@ impl AppState {
             scan_interval_ms,
             autocorrect_threshold,
             word_reject_threshold,
+            frame_diff_threshold,
             target_id,
             crop_region,
             ocr_filters,
@@ -167,6 +170,7 @@ impl AppState {
                 let target = state.target_id.lock().clone();
                 let crop = state.crop_region.lock().clone();
                 let active_filters = state.ocr_filters.lock().clone();
+                let diff_thresh = *state.frame_diff_threshold.lock();
 
                 // Capture frame, crop, apply active multi-filters & emit live preview Data URI if enabled
                 if let Ok(frame_res) = capture_and_crop(&target, &crop, &active_filters, is_preview_active) {
@@ -180,7 +184,7 @@ impl AppState {
                     }
 
                     if !paused && is_ocr_ready {
-                        let (img_changed, new_hash) = has_image_changed(last_frame_hash, &frame_res.filtered_image);
+                        let (img_changed, new_hash) = has_image_changed(last_frame_hash, &frame_res.filtered_image, diff_thresh);
                         if img_changed {
                             last_frame_hash = Some(new_hash);
                             let ocr_guard = state.ocr_engine.lock();
