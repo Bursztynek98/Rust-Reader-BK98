@@ -432,7 +432,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   sliderVolume.addEventListener("input", () => {
     const volPct = parseInt(sliderVolume.value, 10);
-    valVolume.textContent = `${volPct} %`;
+    if (volPct > 100) {
+      valVolume.textContent = `${volPct}% (🔊 Wzmocnienie ${(volPct / 100).toFixed(1)}x)`;
+    } else {
+      valVolume.textContent = `${volPct} %`;
+    }
     invoke("set_tts_volume", { volume: volPct / 100.0 });
   });
 

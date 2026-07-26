@@ -75,7 +75,7 @@ impl AudioPlayer {
                         }
                     }
 
-                    // Apply current volume
+                    // Apply current volume (rodio Sink natively multiplies volume for vol > 1.0)
                     let vol = *vol_clone.lock();
                     sink.set_volume(vol);
 
@@ -109,7 +109,7 @@ impl AudioPlayer {
     }
 
     pub fn set_volume(&self, vol: f32) {
-        *self.volume.lock() = vol.clamp(0.0, 1.0);
+        *self.volume.lock() = vol.clamp(0.0, 3.0);
     }
 
     pub fn set_paused(&self, paused: bool) {
@@ -118,5 +118,17 @@ impl AudioPlayer {
 
     pub fn get_queue_len(&self) -> usize {
         *self.queue_len.lock()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_volume_setting() {
+        let player = AudioPlayer::new().unwrap();
+        player.set_volume(2.5);
+        assert_eq!(*player.volume.lock(), 2.5);
     }
 }

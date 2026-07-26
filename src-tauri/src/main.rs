@@ -123,7 +123,7 @@ fn set_tts_speed(state: State<'_, Arc<AppState>>, speed: f32) -> Result<(), Stri
 
 #[tauri::command]
 fn set_tts_volume(state: State<'_, Arc<AppState>>, volume: f32) -> Result<(), String> {
-    let volume = volume.clamp(0.0, 1.0);
+    let volume = volume.clamp(0.0, 3.0);
     *state.tts_volume.lock() = volume;
     let player_guard = state.audio_player.lock();
     if let Some(ref player) = *player_guard {
