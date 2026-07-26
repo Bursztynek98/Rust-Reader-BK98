@@ -58,17 +58,29 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const chkOcrFilters = document.querySelectorAll<HTMLInputElement>(".chk-ocr-filter");
 
-  const sliderCropTop = document.getElementById("slider-crop-top") as HTMLInputElement;
-  const valCropTop = document.getElementById("val-crop-top") as HTMLSpanElement;
+  const sliderCropCutTop = document.getElementById("slider-crop-cut-top") as HTMLInputElement;
+  const valCropCutTop = document.getElementById("val-crop-cut-top") as HTMLSpanElement;
 
-  const sliderCropHeight = document.getElementById("slider-crop-height") as HTMLInputElement;
-  const valCropHeight = document.getElementById("val-crop-height") as HTMLSpanElement;
+  const sliderCropCutBottom = document.getElementById("slider-crop-cut-bottom") as HTMLInputElement;
+  const valCropCutBottom = document.getElementById("val-crop-cut-bottom") as HTMLSpanElement;
 
-  const sliderCropLeft = document.getElementById("slider-crop-left") as HTMLInputElement;
-  const valCropLeft = document.getElementById("val-crop-left") as HTMLSpanElement;
+  const sliderCropCutLeft = document.getElementById("slider-crop-cut-left") as HTMLInputElement;
+  const valCropCutLeft = document.getElementById("val-crop-cut-left") as HTMLSpanElement;
 
-  const sliderCropWidth = document.getElementById("slider-crop-width") as HTMLInputElement;
-  const valCropWidth = document.getElementById("val-crop-width") as HTMLSpanElement;
+  const sliderCropCutRight = document.getElementById("slider-crop-cut-right") as HTMLInputElement;
+  const valCropCutRight = document.getElementById("val-crop-cut-right") as HTMLSpanElement;
+
+  const boxOverlayTop = document.getElementById("box-overlay-top") as HTMLDivElement;
+  const boxValTop = document.getElementById("box-val-top") as HTMLElement;
+  const boxOverlayBottom = document.getElementById("box-overlay-bottom") as HTMLDivElement;
+  const boxValBottom = document.getElementById("box-val-bottom") as HTMLElement;
+  const boxOverlayLeft = document.getElementById("box-overlay-left") as HTMLDivElement;
+  const boxValLeft = document.getElementById("box-val-left") as HTMLElement;
+  const boxOverlayRight = document.getElementById("box-overlay-right") as HTMLDivElement;
+  const boxValRight = document.getElementById("box-val-right") as HTMLElement;
+  const boxActiveKadr = document.getElementById("box-active-kadr") as HTMLDivElement;
+  const boxActiveDims = document.getElementById("box-active-dims") as HTMLSpanElement;
+  const presetBtns = document.querySelectorAll<HTMLButtonElement>(".preset-btn");
 
   const selectVoice = document.getElementById("select-voice") as HTMLSelectElement;
   const sliderSpeed = document.getElementById("slider-speed") as HTMLInputElement;
@@ -190,19 +202,70 @@ document.addEventListener("DOMContentLoaded", async () => {
     await invoke("set_target", { targetId: targetSelect.value });
   });
 
-  // 2. Crop Sliders Handling
+  // 2. Crop Sliders & Box Model Handling
   function updateCropParams() {
-    const topPct = parseFloat(sliderCropTop.value) / 100.0;
-    const heightPct = parseFloat(sliderCropHeight.value) / 100.0;
-    const leftPct = parseFloat(sliderCropLeft.value) / 100.0;
-    const widthPct = parseFloat(sliderCropWidth.value) / 100.0;
+    let cutTop = parseInt(sliderCropCutTop.value, 10) || 0;
+    let cutBottom = parseInt(sliderCropCutBottom.value, 10) || 0;
+    let cutLeft = parseInt(sliderCropCutLeft.value, 10) || 0;
+    let cutRight = parseInt(sliderCropCutRight.value, 10) || 0;
 
-    valCropTop.textContent = `${sliderCropTop.value} %`;
-    valCropHeight.textContent = `${sliderCropHeight.value} %`;
-    valCropLeft.textContent = `${sliderCropLeft.value} %`;
-    valCropWidth.textContent = `${sliderCropWidth.value} %`;
+    // Enforce max 95% total vertical / horizontal cuts so at least 5% active area remains
+    if (cutTop + cutBottom > 95) {
+      cutBottom = Math.max(0, 95 - cutTop);
+      if (cutBottom === 0) cutTop = 95;
+      sliderCropCutBottom.value = cutBottom.toString();
+      sliderCropCutTop.value = cutTop.toString();
+    }
 
-    previewCropInfo.textContent = `Obszar: Top ${sliderCropTop.value}%, H ${sliderCropHeight.value}%`;
+    if (cutLeft + cutRight > 95) {
+      cutRight = Math.max(0, 95 - cutLeft);
+      if (cutRight === 0) cutLeft = 95;
+      sliderCropCutRight.value = cutRight.toString();
+      sliderCropCutLeft.value = cutLeft.toString();
+    }
+
+    const activeWidthPct = 100 - cutLeft - cutRight;
+    const activeHeightPct = 100 - cutTop - cutBottom;
+
+    // Update slider badges
+    if (valCropCutTop) valCropCutTop.textContent = `${cutTop} %`;
+    if (valCropCutBottom) valCropCutBottom.textContent = `${cutBottom} %`;
+    if (valCropCutLeft) valCropCutLeft.textContent = `${cutLeft} %`;
+    if (valCropCutRight) valCropCutRight.textContent = `${cutRight} %`;
+
+    // Update Box Model visual overlays & active kadr box
+    if (boxOverlayTop) boxOverlayTop.style.height = `${cutTop}%`;
+    if (boxValTop) boxValTop.textContent = `${cutTop}%`;
+
+    if (boxOverlayBottom) boxOverlayBottom.style.height = `${cutBottom}%`;
+    if (boxValBottom) boxValBottom.textContent = `${cutBottom}%`;
+
+    if (boxOverlayLeft) boxOverlayLeft.style.width = `${cutLeft}%`;
+    if (boxValLeft) boxValLeft.textContent = `${cutLeft}%`;
+
+    if (boxOverlayRight) boxOverlayRight.style.width = `${cutRight}%`;
+    if (boxValRight) boxValRight.textContent = `${cutRight}%`;
+
+    if (boxActiveKadr) {
+      boxActiveKadr.style.top = `${cutTop}%`;
+      boxActiveKadr.style.bottom = `${cutBottom}%`;
+      boxActiveKadr.style.left = `${cutLeft}%`;
+      boxActiveKadr.style.right = `${cutRight}%`;
+    }
+
+    if (boxActiveDims) {
+      boxActiveDims.textContent = `${activeWidthPct}% × ${activeHeightPct}%`;
+    }
+
+    if (previewCropInfo) {
+      previewCropInfo.textContent = `Obszar: ${activeWidthPct}% × ${activeHeightPct}% (G:${cutTop}% D:${cutBottom}%)`;
+    }
+
+    // Convert cut margins to Rust crop params (top_pct, height_pct, left_pct, width_pct)
+    const topPct = cutTop / 100.0;
+    const heightPct = activeHeightPct / 100.0;
+    const leftPct = cutLeft / 100.0;
+    const widthPct = activeWidthPct / 100.0;
 
     invoke("set_crop", {
       topPct,
@@ -212,10 +275,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  sliderCropTop.addEventListener("input", updateCropParams);
-  sliderCropHeight.addEventListener("input", updateCropParams);
-  sliderCropLeft.addEventListener("input", updateCropParams);
-  sliderCropWidth.addEventListener("input", updateCropParams);
+  if (sliderCropCutTop) sliderCropCutTop.addEventListener("input", updateCropParams);
+  if (sliderCropCutBottom) sliderCropCutBottom.addEventListener("input", updateCropParams);
+  if (sliderCropCutLeft) sliderCropCutLeft.addEventListener("input", updateCropParams);
+  if (sliderCropCutRight) sliderCropCutRight.addEventListener("input", updateCropParams);
+
+  presetBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const top = btn.dataset.top;
+      const bottom = btn.dataset.bottom;
+      const left = btn.dataset.left;
+      const right = btn.dataset.right;
+
+      if (top !== undefined && sliderCropCutTop) sliderCropCutTop.value = top;
+      if (bottom !== undefined && sliderCropCutBottom) sliderCropCutBottom.value = bottom;
+      if (left !== undefined && sliderCropCutLeft) sliderCropCutLeft.value = left;
+      if (right !== undefined && sliderCropCutRight) sliderCropCutRight.value = right;
+
+      updateCropParams();
+    });
+  });
+
+  // Initial update of crop Box Model visual state
+  updateCropParams();
 
   // 3. Scan Interval & OCR Multi-Filter Checkboxes
   sliderInterval.addEventListener("input", () => {
