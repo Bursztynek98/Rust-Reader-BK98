@@ -9,8 +9,6 @@ use std::sync::Arc;
 use std::thread;
 
 pub struct AudioItem {
-    #[allow(dead_code)]
-    pub text: String,
     pub samples: Vec<f32>,
     pub sample_rate: u32,
 }

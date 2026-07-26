@@ -25,9 +25,6 @@ interface SubtitleHistoryEntry {
   filter_time_ms: number;
   ocr_time_ms: number;
   tts_time_ms: number;
-  boxes_passed: number;
-  boxes_filtered: number;
-  status: string;
 }
 
 interface TelemetryData {
@@ -44,7 +41,6 @@ interface TelemetryData {
   filter_time_ms: number;
   ocr_time_ms: number;
   tts_time_ms: number;
-  engine_status: string;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

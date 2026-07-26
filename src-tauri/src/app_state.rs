@@ -35,9 +35,6 @@ pub struct SubtitleHistoryEntry {
     pub filter_time_ms: f64,
     pub ocr_time_ms: f64,
     pub tts_time_ms: f64,
-    pub boxes_passed: usize,
-    pub boxes_filtered: usize,
-    pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,7 +52,6 @@ pub struct TelemetryData {
     pub filter_time_ms: f64,
     pub ocr_time_ms: f64,
     pub tts_time_ms: f64,
-    pub engine_status: String,
 }
 
 pub struct AppState {
@@ -77,7 +73,6 @@ pub struct AppState {
     pub ocr_engine: Arc<Mutex<Option<OcrEngine>>>,
     pub tts_engine: Arc<Mutex<Option<TtsEngine>>>,
     pub audio_player: Arc<Mutex<Option<AudioPlayer>>>,
-    pub engine_status: Arc<Mutex<String>>,
 }
 
 impl AppState {
@@ -94,7 +89,6 @@ impl AppState {
         let tts_speed = Arc::new(Mutex::new(1.0f32));
         let tts_volume = Arc::new(Mutex::new(1.0f32));
         let last_spoken_text = Arc::new(Mutex::new(String::new()));
-        let engine_status = Arc::new(Mutex::new("Inicjalizacja silników...".to_string()));
 
         let ocr_loaded = Arc::new(AtomicBool::new(false));
         let tts_loaded = Arc::new(AtomicBool::new(false));
@@ -119,7 +113,6 @@ impl AppState {
             ocr_engine: Arc::new(Mutex::new(None)),
             tts_engine: Arc::new(Mutex::new(None)),
             audio_player: Arc::new(Mutex::new(audio_player)),
-            engine_status,
         }
     }
 
@@ -137,7 +130,6 @@ impl AppState {
                 }
                 Err(e) => {
                     eprintln!("[Worker] ❌ OCR load error: {:?}", e);
-                    *state_for_init.engine_status.lock() = format!("Błąd OCR: {:?}", e);
                 }
             }
 
@@ -147,7 +139,6 @@ impl AppState {
                     *state_for_init.tts_engine.lock() = Some(tts);
                     state_for_init.tts_loaded.store(true, Ordering::Relaxed);
                     println!("[Worker] ✓ TTS engine loaded.");
-                    *state_for_init.engine_status.lock() = "Model OCR & TTS Załadowany".to_string();
                 }
                 Err(e) => {
                     eprintln!("[Worker] ❌ TTS load error: {:?}", e);
@@ -223,7 +214,6 @@ impl AppState {
                                                     let player_guard = state.audio_player.lock();
                                                     if let Some(ref player) = *player_guard {
                                                         let _ = player.enqueue(AudioItem {
-                                                            text: text_to_speak.clone(),
                                                             samples: audio.samples,
                                                             sample_rate: audio.sample_rate,
                                                         });
@@ -244,9 +234,6 @@ impl AppState {
                                             filter_time_ms: last_filter_time,
                                             ocr_time_ms: last_ocr_time,
                                             tts_time_ms: last_tts_time,
-                                            boxes_passed: ocr_res.boxes_passed,
-                                            boxes_filtered: ocr_res.boxes_filtered,
-                                            status: "SPOKEN".to_string(),
                                         };
 
                                         let _ = app_handle.emit("ocr_result", entry);
@@ -262,14 +249,6 @@ impl AppState {
                 let b_speed = *state.tts_speed.lock();
                 let eff_speed = if qlen > 1 { (b_speed * 2.5).min(3.5) } else { b_speed };
 
-                let current_status = if paused {
-                    "WSTRZYMANE (Kliknij START)".to_string()
-                } else if !is_ocr_ready || !is_tts_ready {
-                    "Ładowanie modeli...".to_string()
-                } else {
-                    "SKANOWANIE AKTYWNE".to_string()
-                };
-
                 let _ = app_handle.emit("telemetry_update", TelemetryData {
                     scan_interval_ms: interval,
                     is_paused: paused,
@@ -284,7 +263,6 @@ impl AppState {
                     filter_time_ms: last_filter_time,
                     ocr_time_ms: last_ocr_time,
                     tts_time_ms: last_tts_time,
-                    engine_status: current_status,
                 });
 
                 thread::sleep(Duration::from_millis(interval));

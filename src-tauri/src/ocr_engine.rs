@@ -19,8 +19,6 @@ pub struct OcrResult {
     pub confidence: f32,
     pub words: Vec<WordInfo>,
     pub duration_ms: f64,
-    pub boxes_passed: usize,
-    pub boxes_filtered: usize,
 }
 
 pub struct OcrEngine {
@@ -101,15 +99,12 @@ impl OcrEngine {
         let mut all_words = Vec::new();
         let mut total_conf = 0.0f32;
         let mut count = 0usize;
-        let mut boxes_passed = 0usize;
-        let mut boxes_filtered = 0usize;
 
         if let Some(res) = predictions.first() {
             for region in &res.text_regions {
                 if let Some((raw_text, confidence)) = region.text_with_confidence() {
                     // Reject low-confidence OCR regions completely (e.g. confidence < 40%)
                     if confidence < word_reject_threshold {
-                        boxes_filtered += 1;
                         continue;
                     }
                     let mut box_w = 50u32;
@@ -128,7 +123,6 @@ impl OcrEngine {
 
                     // Apply box size filter
                     if !is_valid_box_size(box_w, box_h, frame_w, frame_h) {
-                        boxes_filtered += 1;
                         continue;
                     }
 
@@ -137,11 +131,8 @@ impl OcrEngine {
 
                     // Apply text repetition & standalone dot/comma filter
                     if !is_clean_text(&clean_raw) {
-                        boxes_filtered += 1;
                         continue;
                     }
-
-                    boxes_passed += 1;
 
                     let mut line_corrected_words = Vec::new();
                     for word in clean_raw.split_whitespace() {
@@ -195,8 +186,6 @@ impl OcrEngine {
             confidence: avg_conf,
             words: all_words,
             duration_ms,
-            boxes_passed,
-            boxes_filtered,
         })
     }
 }
