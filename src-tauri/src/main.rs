@@ -56,13 +56,59 @@ fn set_scan_interval(state: State<'_, Arc<AppState>>, interval_ms: u64) -> Resul
 }
 
 #[tauri::command]
-fn set_tts_voice(state: State<'_, Arc<AppState>>, voice_key: String) -> Result<(), String> {
+fn get_tts_voices() -> Result<Vec<tts_engine::VoiceInfo>, String> {
+    Ok(tts_engine::get_voices_info())
+}
+
+#[tauri::command]
+fn set_tts_voice(app_handle: tauri::AppHandle, state: State<'_, Arc<AppState>>, voice_key: String) -> Result<(), String> {
     *state.tts_voice.lock() = voice_key.clone();
     let state_clone = Arc::clone(&state);
+    let handle_clone = app_handle.clone();
     std::thread::spawn(move || {
+        let voice_name = tts_engine::VOICES
+            .iter()
+            .find(|v| v.key == voice_key)
+            .map(|v| v.name)
+            .unwrap_or(&voice_key);
+
+        let model_dir = tts_engine::get_models_base_dir().join(&voice_key);
+        let is_already_downloaded = tts_engine::is_voice_downloaded(&model_dir);
+
+        if !is_already_downloaded {
+            use tauri::Emitter;
+            let _ = handle_clone.emit(
+                "tts_download_progress",
+                tts_engine::TtsDownloadProgressPayload {
+                    voice_key: voice_key.clone(),
+                    voice_name: voice_name.to_string(),
+                    downloaded_bytes: 0,
+                    total_bytes: 0,
+                    pct: 0.0,
+                    status: "downloading".to_string(),
+                    error_msg: None,
+                },
+            );
+        }
+
         let tts_guard = state_clone.tts_engine.lock();
         if let Some(ref tts) = *tts_guard {
-            let _ = tts.load_voice(&voice_key);
+            if let Err(e) = tts.load_voice(&voice_key, Some(&handle_clone)) {
+                eprintln!("Failed to load voice {}: {}", voice_key, e);
+                use tauri::Emitter;
+                let _ = handle_clone.emit(
+                    "tts_download_progress",
+                    tts_engine::TtsDownloadProgressPayload {
+                        voice_key: voice_key.clone(),
+                        voice_name: voice_name.to_string(),
+                        downloaded_bytes: 0,
+                        total_bytes: 0,
+                        pct: 0.0,
+                        status: "error".to_string(),
+                        error_msg: Some(e.to_string()),
+                    },
+                );
+            }
         }
     });
     Ok(())
@@ -139,6 +185,7 @@ fn main() {
             set_preview_enabled,
             set_autocorrect_threshold,
             set_word_reject_threshold,
+            get_tts_voices,
             set_tts_voice,
             set_tts_speed,
             set_tts_volume,

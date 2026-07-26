@@ -7,6 +7,22 @@ interface CaptureTargetInfo {
   is_window: boolean;
 }
 
+interface VoiceInfo {
+  key: string;
+  name: string;
+  is_downloaded: boolean;
+}
+
+interface TtsDownloadProgressPayload {
+  voice_key: string;
+  voice_name: string;
+  downloaded_bytes: number;
+  total_bytes: number;
+  pct: number;
+  status: string;
+  error_msg?: string;
+}
+
 interface WordInfo {
   raw: string;
   corrected: string;
@@ -83,6 +99,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const presetBtns = document.querySelectorAll<HTMLButtonElement>(".preset-btn");
 
   const selectVoice = document.getElementById("select-voice") as HTMLSelectElement;
+  const ttsDownloadStatus = document.getElementById("tts-download-status") as HTMLDivElement;
+  const ttsStatusText = document.getElementById("tts-status-text") as HTMLSpanElement;
+  const ttsStatusPct = document.getElementById("tts-status-pct") as HTMLSpanElement;
+  const ttsProgressBarFill = document.getElementById("tts-progress-bar-fill") as HTMLDivElement;
   const sliderSpeed = document.getElementById("slider-speed") as HTMLInputElement;
   const valSpeed = document.getElementById("val-speed") as HTMLSpanElement;
 
@@ -320,9 +340,71 @@ document.addEventListener("DOMContentLoaded", async () => {
     chk.addEventListener("change", updateActiveFilters);
   });
 
-  // 4. TTS Controls
+  // 4. TTS Controls & Voice Downloading Status
+  async function refreshVoicesList() {
+    try {
+      const voices = await invoke<VoiceInfo[]>("get_tts_voices");
+      const currentSelected = selectVoice ? selectVoice.value : "piper_jarvis";
+      if (selectVoice) {
+        selectVoice.innerHTML = "";
+        voices.forEach((v) => {
+          const opt = document.createElement("option");
+          opt.value = v.key;
+          opt.textContent = v.is_downloaded
+            ? `✅ ${v.name}`
+            : `☁️ ${v.name} (Do pobrania)`;
+          if (v.key === currentSelected) {
+            opt.selected = true;
+          }
+          selectVoice.appendChild(opt);
+        });
+      }
+    } catch (e) {
+      console.error("Failed to load TTS voices info:", e);
+    }
+  }
+
+  await refreshVoicesList();
+
   selectVoice.addEventListener("change", () => {
     invoke("set_tts_voice", { voiceKey: selectVoice.value });
+  });
+
+  await listen<TtsDownloadProgressPayload>("tts_download_progress", (event) => {
+    const payload = event.payload;
+    if (!ttsDownloadStatus) return;
+
+    if (payload.status === "downloading") {
+      ttsDownloadStatus.style.display = "flex";
+      const downloadedMB = (payload.downloaded_bytes / (1024 * 1024)).toFixed(1);
+      const totalMB = payload.total_bytes > 0 ? (payload.total_bytes / (1024 * 1024)).toFixed(1) : "?";
+      if (ttsStatusText) ttsStatusText.textContent = `☁️ Pobieranie: ${downloadedMB} / ${totalMB} MB`;
+      if (ttsStatusPct) ttsStatusPct.textContent = `${Math.round(payload.pct)} %`;
+      if (ttsProgressBarFill) ttsProgressBarFill.style.width = `${payload.pct}%`;
+    } else if (payload.status === "extracting") {
+      ttsDownloadStatus.style.display = "flex";
+      if (ttsStatusText) ttsStatusText.textContent = "📦 Rozpakowywanie archiwum modelu...";
+      if (ttsStatusPct) ttsStatusPct.textContent = "99 %";
+      if (ttsProgressBarFill) ttsProgressBarFill.style.width = "99%";
+    } else if (payload.status === "loading_into_memory") {
+      ttsDownloadStatus.style.display = "flex";
+      if (ttsStatusText) ttsStatusText.textContent = "⚡ Inicjalizacja w pamięci GPU/CPU...";
+      if (ttsStatusPct) ttsStatusPct.textContent = "100 %";
+      if (ttsProgressBarFill) ttsProgressBarFill.style.width = "100%";
+    } else if (payload.status === "ready") {
+      ttsDownloadStatus.style.display = "flex";
+      if (ttsStatusText) ttsStatusText.textContent = "✅ Głos gotowy do użycia!";
+      if (ttsStatusPct) ttsStatusPct.textContent = "100 %";
+      if (ttsProgressBarFill) ttsProgressBarFill.style.width = "100%";
+      setTimeout(() => {
+        if (ttsDownloadStatus) ttsDownloadStatus.style.display = "none";
+      }, 2500);
+      refreshVoicesList();
+    } else if (payload.status === "error") {
+      ttsDownloadStatus.style.display = "flex";
+      if (ttsStatusText) ttsStatusText.textContent = `❌ Błąd: ${payload.error_msg || "Nieudane pobieranie"}`;
+      if (ttsStatusPct) ttsStatusPct.textContent = "ERR";
+    }
   });
 
   sliderSpeed.addEventListener("input", () => {

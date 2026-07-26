@@ -7,13 +7,15 @@ use sherpa_onnx::{
     GenerationConfig, OfflineTts, OfflineTtsConfig, OfflineTtsModelConfig,
     OfflineTtsSupertonicModelConfig, OfflineTtsVitsModelConfig,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Instant;
 use tar::Archive;
+use tauri::{AppHandle, Emitter};
 
 pub struct VoiceDefinition {
     pub key: &'static str,
@@ -22,62 +24,123 @@ pub struct VoiceDefinition {
     pub is_supertonic: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoiceInfo {
+    pub key: String,
+    pub name: String,
+    pub is_downloaded: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TtsDownloadProgressPayload {
+    pub voice_key: String,
+    pub voice_name: String,
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub pct: f32,
+    pub status: String,
+    pub error_msg: Option<String>,
+}
+
 pub const VOICES: &[VoiceDefinition] = &[
     VoiceDefinition {
         key: "piper_jarvis",
-        name: "Polski głos Jarvis (Piper VITS)",
+        name: "Polski Jarvis (Piper VITS)",
         url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-jarvis_wg_glos-medium.tar.bz2",
         is_supertonic: false,
     },
     VoiceDefinition {
         key: "piper_zenski",
-        name: "Polski głos żeński (Piper VITS)",
+        name: "Polski żeński (Piper VITS)",
         url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-zenski_wg_glos-medium.tar.bz2",
         is_supertonic: false,
     },
     VoiceDefinition {
         key: "piper_meski",
-        name: "Polski głos męski (Piper VITS)",
+        name: "Polski męski (Piper VITS)",
         url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-meski_wg_glos-medium.tar.bz2",
         is_supertonic: false,
     },
     VoiceDefinition {
         key: "piper_gosia",
-        name: "Polski głos Gosia (Piper VITS)",
+        name: "Polski Gosia (Piper VITS)",
         url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-gosia-medium.tar.bz2",
         is_supertonic: false,
     },
     VoiceDefinition {
         key: "piper_justyna",
-        name: "Polski głos Justyna (Piper VITS)",
+        name: "Polski Justyna (Piper VITS)",
         url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-justyna_wg_glos-medium.tar.bz2",
         is_supertonic: false,
     },
     VoiceDefinition {
         key: "piper_darkman",
-        name: "Polski głos Darkman (Piper VITS)",
+        name: "Polski Darkman (Piper VITS)",
         url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-darkman-medium.tar.bz2",
         is_supertonic: false,
     },
     VoiceDefinition {
         key: "piper_bass",
-        name: "Polski głos Bass (Piper VITS High)",
+        name: "Polski Bass (Piper VITS High)",
         url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-bass-high.tar.bz2",
         is_supertonic: false,
     },
     VoiceDefinition {
         key: "piper_mc_speech",
-        name: "Polski głos MC Speech (Piper VITS)",
+        name: "Polski MC Speech (Piper VITS)",
         url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-pl_PL-mc_speech-medium.tar.bz2",
         is_supertonic: false,
     },
     VoiceDefinition {
         key: "supertonic",
-        name: "Wielojęzyczny Supertonic 3 (Polski)",
+        name: "Supertonic 3 (Multilingual)",
         url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2",
         is_supertonic: true,
     },
 ];
+
+pub fn get_models_base_dir() -> PathBuf {
+    if Path::new("src-tauri/models").exists() {
+        PathBuf::from("src-tauri/models")
+    } else if Path::new("models").exists() {
+        PathBuf::from("models")
+    } else {
+        PathBuf::from("src-tauri/models")
+    }
+}
+
+pub fn get_voices_info() -> Vec<VoiceInfo> {
+    let base_dir = get_models_base_dir();
+    VOICES
+        .iter()
+        .map(|v| {
+            let model_dir = base_dir.join(v.key);
+            let is_downloaded = is_voice_downloaded(&model_dir);
+            VoiceInfo {
+                key: v.key.to_string(),
+                name: v.name.to_string(),
+                is_downloaded,
+            }
+        })
+        .collect()
+}
+
+pub fn is_voice_downloaded(model_dir: &Path) -> bool {
+    if !model_dir.exists() {
+        return false;
+    }
+    let mut files = Vec::new();
+    let mut dirs = Vec::new();
+    if search_dir_recursive(model_dir, &mut files, &mut dirs).is_ok() {
+        for path in files {
+            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if file_name.ends_with(".onnx") || file_name == "tts.json" {
+                return true;
+            }
+        }
+    }
+    false
+}
 
 pub struct GeneratedAudio {
     pub samples: Vec<f32>,
@@ -103,19 +166,34 @@ impl TtsEngine {
             tts_instance: Mutex::new(None),
         };
 
-        // Try loading initial voice
-        let _ = engine.load_voice(&voice_key);
+        // Try loading initial voice without app_handle
+        let _ = engine.load_voice(&voice_key, None);
         Ok(engine)
     }
 
-    pub fn load_voice(&self, voice_key: &str) -> Result<()> {
+    pub fn load_voice(&self, voice_key: &str, app_handle: Option<&AppHandle>) -> Result<()> {
         let voice_def = VOICES
             .iter()
             .find(|v| v.key == voice_key)
             .ok_or_else(|| anyhow!("Unknown voice key: {}", voice_key))?;
 
-        let models_root = PathBuf::from("models").join(voice_def.key);
-        ensure_voice_model_downloaded(voice_def, &models_root)?;
+        let models_root = get_models_base_dir().join(voice_def.key);
+        ensure_voice_model_downloaded(voice_def, &models_root, app_handle)?;
+
+        if let Some(app) = app_handle {
+            let _ = app.emit(
+                "tts_download_progress",
+                TtsDownloadProgressPayload {
+                    voice_key: voice_def.key.to_string(),
+                    voice_name: voice_def.name.to_string(),
+                    downloaded_bytes: 0,
+                    total_bytes: 0,
+                    pct: 100.0,
+                    status: "loading_into_memory".to_string(),
+                    error_msg: None,
+                },
+            );
+        }
 
         let mut model_config = OfflineTtsModelConfig {
             num_threads: 4,
@@ -149,6 +227,22 @@ impl TtsEngine {
         let mut lock = self.tts_instance.lock().unwrap();
         *lock = Some(tts);
         *self.active_voice_key.lock().unwrap() = voice_key.to_string();
+
+        if let Some(app) = app_handle {
+            let _ = app.emit(
+                "tts_download_progress",
+                TtsDownloadProgressPayload {
+                    voice_key: voice_def.key.to_string(),
+                    voice_name: voice_def.name.to_string(),
+                    downloaded_bytes: 0,
+                    total_bytes: 0,
+                    pct: 100.0,
+                    status: "ready".to_string(),
+                    error_msg: None,
+                },
+            );
+        }
+
         Ok(())
     }
 
@@ -187,8 +281,12 @@ impl TtsEngine {
     }
 }
 
-fn ensure_voice_model_downloaded(voice_def: &VoiceDefinition, model_dir: &Path) -> Result<()> {
-    if model_dir.exists() && fs::read_dir(model_dir)?.next().is_some() {
+fn ensure_voice_model_downloaded(
+    voice_def: &VoiceDefinition,
+    model_dir: &Path,
+    app_handle: Option<&AppHandle>,
+) -> Result<()> {
+    if is_voice_downloaded(model_dir) {
         return Ok(());
     }
 
@@ -199,24 +297,84 @@ fn ensure_voice_model_downloaded(voice_def: &VoiceDefinition, model_dir: &Path) 
 
     let mut response = client.get(voice_def.url).send().context("HTTP download failed")?;
     if !response.status().is_success() {
-        return Err(anyhow!("HTTP error status: {}", response.status()));
+        let err_msg = format!("HTTP error status: {}", response.status());
+        if let Some(app) = app_handle {
+            let _ = app.emit(
+                "tts_download_progress",
+                TtsDownloadProgressPayload {
+                    voice_key: voice_def.key.to_string(),
+                    voice_name: voice_def.name.to_string(),
+                    downloaded_bytes: 0,
+                    total_bytes: 0,
+                    pct: 0.0,
+                    status: "error".to_string(),
+                    error_msg: Some(err_msg.clone()),
+                },
+            );
+        }
+        return Err(anyhow!(err_msg));
     }
 
+    let total_bytes = response.content_length().unwrap_or(0);
+
     let mut downloaded_bytes: Vec<u8> = Vec::new();
-    let mut buffer = [0u8; 8192];
+    let mut buffer = [0u8; 16384];
+    let mut last_emit = Instant::now();
+
     loop {
         let bytes_read = response.read(&mut buffer)?;
         if bytes_read == 0 {
             break;
         }
         downloaded_bytes.extend_from_slice(&buffer[..bytes_read]);
+
+        if let Some(app) = app_handle {
+            if last_emit.elapsed().as_millis() > 100 || downloaded_bytes.len() as u64 == total_bytes {
+                last_emit = Instant::now();
+                let downloaded_len = downloaded_bytes.len() as u64;
+                let pct = if total_bytes > 0 {
+                    (downloaded_len as f32 / total_bytes as f32) * 100.0
+                } else {
+                    0.0
+                };
+                let _ = app.emit(
+                    "tts_download_progress",
+                    TtsDownloadProgressPayload {
+                        voice_key: voice_def.key.to_string(),
+                        voice_name: voice_def.name.to_string(),
+                        downloaded_bytes: downloaded_len,
+                        total_bytes,
+                        pct,
+                        status: "downloading".to_string(),
+                        error_msg: None,
+                    },
+                );
+            }
+        }
     }
 
-    let bz = BzDecoder::new(&downloaded_bytes[..]);
-    let mut archive = Archive::new(bz);
+    if let Some(app) = app_handle {
+        let _ = app.emit(
+            "tts_download_progress",
+            TtsDownloadProgressPayload {
+                voice_key: voice_def.key.to_string(),
+                voice_name: voice_def.name.to_string(),
+                downloaded_bytes: downloaded_bytes.len() as u64,
+                total_bytes,
+                pct: 100.0,
+                status: "extracting".to_string(),
+                error_msg: None,
+            },
+        );
+    }
 
+    println!("Extracting tar.bz2 for {} ...", voice_def.name);
     fs::create_dir_all(model_dir)?;
+    let tar_bz2 = Cursor::new(&downloaded_bytes);
+    let decompressor = BzDecoder::new(tar_bz2);
+    let mut archive = Archive::new(decompressor);
     archive.unpack(model_dir).context("Unpacking archive failed")?;
+
     Ok(())
 }
 
