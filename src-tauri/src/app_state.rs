@@ -69,7 +69,7 @@ pub struct AppState {
     pub tts_voice: Arc<Mutex<String>>,
     pub tts_speed: Arc<Mutex<f32>>,
     pub tts_volume: Arc<Mutex<f32>>,
-    pub last_spoken_text: Arc<Mutex<String>>,
+    pub last_raw_text: Arc<Mutex<String>>,
 
     pub ocr_loaded: Arc<AtomicBool>,
     pub tts_loaded: Arc<AtomicBool>,
@@ -94,7 +94,7 @@ impl AppState {
         let tts_voice = Arc::new(Mutex::new("piper_jarvis".to_string()));
         let tts_speed = Arc::new(Mutex::new(1.0f32));
         let tts_volume = Arc::new(Mutex::new(1.0f32));
-        let last_spoken_text = Arc::new(Mutex::new(String::new()));
+        let last_raw_text = Arc::new(Mutex::new(String::new()));
 
         let ocr_loaded = Arc::new(AtomicBool::new(false));
         let tts_loaded = Arc::new(AtomicBool::new(false));
@@ -116,7 +116,7 @@ impl AppState {
             tts_voice,
             tts_speed,
             tts_volume,
-            last_spoken_text,
+            last_raw_text,
             ocr_loaded,
             tts_loaded,
             ocr_engine: Arc::new(Mutex::new(None)),
@@ -204,12 +204,12 @@ impl AppState {
                                     last_ocr_time = ocr_res.duration_ms;
                                     let now_str = chrono_now_str();
 
-                                    if !ocr_res.corrected_text.is_empty() {
+                                    if !ocr_res.corrected_text.is_empty() && !ocr_res.raw_text.is_empty() {
 
-                                    let mut last_txt = state.last_spoken_text.lock();
+                                    let mut last_txt = state.last_raw_text.lock();
                                     
-                                    if has_significant_change(&last_txt, &ocr_res.corrected_text) {
-                                        *last_txt = ocr_res.corrected_text.clone();
+                                    if has_significant_change(&last_txt, &ocr_res.raw_text) {
+                                        *last_txt = ocr_res.raw_text.clone();
                                         let text_to_speak = ocr_res.corrected_text.clone();
                                         drop(last_txt);
 
