@@ -329,6 +329,7 @@ html, body {
 .divider {
   border: none;
   height: 1px;
+  min-height: 1px;
   background: var(--border-card);
   margin: 2px 0;
 }

@@ -14,7 +14,11 @@
       {
         "title": "Rust Reader - Subtitle OCR & TTS Player",
         "width": 1280,
-        "height": 900,
+        "height": 970,
+        "minWidth": 1200,
+        "minHeight": 650,
+        "maxWidth": 1280,
+        "maxHeight": 970,
         "resizable": true,
         "fullscreen": false
       }

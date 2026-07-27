@@ -5,13 +5,191 @@ use image::{imageops, DynamicImage, GrayImage, RgbaImage};
 use oar_ocr::core::config::onnx::{OrtExecutionProvider, OrtSessionConfig};
 use oar_ocr::prelude::*;
 use symspell::{SymSpell, UnicodeiStringStrategy, Verbosity};
-use std::fs;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Emitter};
 
 use crate::app_state::WordInfo;
 use crate::box_filter::{is_clean_text, is_valid_box_size, sanitize_text};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OcrModelInfo {
+    pub id: String,
+    pub name: String,
+    pub filename: String,
+    pub is_downloaded: bool,
+    pub file_size_mb: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OcrDownloadProgressPayload {
+    pub model_key: String,
+    pub model_name: String,
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub pct: f32,
+    pub status: String,
+    pub error_msg: Option<String>,
+}
+
+pub fn get_oar_dir() -> PathBuf {
+    oar_ocr::core::download::cache_dir()
+}
+
+pub fn is_ocr_file_downloaded(filename: &str) -> bool {
+    let path = get_oar_dir().join(filename);
+    if path.exists() {
+        if let Ok(meta) = fs::metadata(&path) {
+            return meta.len() > 0;
+        }
+    }
+    false
+}
+
+pub fn get_detection_models_info() -> Vec<OcrModelInfo> {
+    vec![
+        OcrModelInfo {
+            id: "pp-ocrv6_tiny_det".to_string(),
+            name: "PP-OCRv6 Tiny Det".to_string(),
+            filename: "pp-ocrv6_tiny_det.onnx".to_string(),
+            is_downloaded: is_ocr_file_downloaded("pp-ocrv6_tiny_det.onnx"),
+            file_size_mb: 1.8,
+        },
+        OcrModelInfo {
+            id: "pp-ocrv6_small_det".to_string(),
+            name: "PP-OCRv6 Small Det".to_string(),
+            filename: "pp-ocrv6_small_det.onnx".to_string(),
+            is_downloaded: is_ocr_file_downloaded("pp-ocrv6_small_det.onnx"),
+            file_size_mb: 9.8,
+        },
+        OcrModelInfo {
+            id: "pp-ocrv6_medium_det".to_string(),
+            name: "PP-OCRv6 Medium Det".to_string(),
+            filename: "pp-ocrv6_medium_det.onnx".to_string(),
+            is_downloaded: is_ocr_file_downloaded("pp-ocrv6_medium_det.onnx"),
+            file_size_mb: 62.0,
+        },
+    ]
+}
+
+pub fn get_recognition_models_info() -> Vec<OcrModelInfo> {
+    vec![
+        OcrModelInfo {
+            id: "tiny".to_string(),
+            name: "PP-OCRv6 Tiny Rec (6.9k słownika)".to_string(),
+            filename: "pp-ocrv6_tiny_rec.onnx".to_string(),
+            is_downloaded: is_ocr_file_downloaded("pp-ocrv6_tiny_rec.onnx")
+                && is_ocr_file_downloaded("ppocrv6_tiny_dict.txt"),
+            file_size_mb: 4.5,
+        },
+        OcrModelInfo {
+            id: "small".to_string(),
+            name: "PP-OCRv6 Small Rec (18.7k słownika)".to_string(),
+            filename: "pp-ocrv6_small_rec.onnx".to_string(),
+            is_downloaded: is_ocr_file_downloaded("pp-ocrv6_small_rec.onnx")
+                && is_ocr_file_downloaded("ppocrv6_dict.txt"),
+            file_size_mb: 21.2,
+        },
+        OcrModelInfo {
+            id: "medium".to_string(),
+            name: "PP-OCRv6 Medium Rec (18.7k słownika)".to_string(),
+            filename: "pp-ocrv6_medium_rec.onnx".to_string(),
+            is_downloaded: is_ocr_file_downloaded("pp-ocrv6_medium_rec.onnx")
+                && is_ocr_file_downloaded("ppocrv6_dict.txt"),
+            file_size_mb: 76.6,
+        },
+    ]
+}
+
+pub fn ensure_ocr_file_downloaded(
+    filename: &str,
+    model_name: &str,
+    app_handle: Option<&AppHandle>,
+) -> Result<()> {
+    let oar_dir = get_oar_dir();
+    fs::create_dir_all(&oar_dir)?;
+    let target_path = oar_dir.join(filename);
+
+    if target_path.exists() && fs::metadata(&target_path).map(|m| m.len() > 0).unwrap_or(false) {
+        return Ok(());
+    }
+
+    let url = format!(
+        "https://www.modelscope.cn/api/v1/models/greatv/oar-ocr/repo?Revision=master&FilePath={}",
+        filename
+    );
+
+    if let Some(app) = app_handle {
+        let _ = app.emit(
+            "ocr_download_progress",
+            OcrDownloadProgressPayload {
+                model_key: filename.to_string(),
+                model_name: model_name.to_string(),
+                downloaded_bytes: 0,
+                total_bytes: 0,
+                pct: 0.0,
+                status: "downloading".to_string(),
+                error_msg: None,
+            },
+        );
+    }
+
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("RustReader-Downloader")
+        .timeout(Duration::from_secs(600))
+        .build()?;
+
+    let mut response = client.get(&url).send().map_err(|e| anyhow!("HTTP request failed: {:?}", e))?;
+    if !response.status().is_success() {
+        return Err(anyhow!("Failed to download {}: HTTP {}", filename, response.status()));
+    }
+
+    let total_size = response.content_length().unwrap_or(0);
+    let tmp_path = oar_dir.join(format!(".{}.part", filename));
+    let mut file = File::create(&tmp_path)?;
+    let mut downloaded: u64 = 0;
+    let mut buffer = [0u8; 65536];
+
+    loop {
+        use std::io::Read;
+        let bytes_read = response.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        file.write_all(&buffer[..bytes_read])?;
+        downloaded += bytes_read as u64;
+
+        if let Some(app) = app_handle {
+            let pct = if total_size > 0 {
+                (downloaded as f32 / total_size as f32) * 100.0
+            } else {
+                0.0
+            };
+            let _ = app.emit(
+                "ocr_download_progress",
+                OcrDownloadProgressPayload {
+                    model_key: filename.to_string(),
+                    model_name: model_name.to_string(),
+                    downloaded_bytes: downloaded,
+                    total_bytes: total_size,
+                    pct,
+                    status: "downloading".to_string(),
+                    error_msg: None,
+                },
+            );
+        }
+    }
+
+    file.flush()?;
+    drop(file);
+
+    fs::rename(&tmp_path, &target_path)?;
+    Ok(())
+}
 
 pub struct OcrResult {
     pub raw_text: String,
@@ -27,7 +205,46 @@ pub struct OcrEngine {
 }
 
 impl OcrEngine {
-    pub fn new() -> Result<Self> {
+    // pub fn new() -> Result<Self> {
+    //     Self::new_with_models("pp-ocrv6_tiny_det", "small", None)
+    // }
+
+    pub fn new_with_models(
+        det_id: &str,
+        rec_id: &str,
+        app_handle: Option<&AppHandle>,
+    ) -> Result<Self> {
+        let (det_filename, det_name) = match det_id {
+            "pp-ocrv6_medium_det" => ("pp-ocrv6_medium_det.onnx", "PP-OCRv6 Medium Det"),
+            "pp-ocrv6_small_det" => ("pp-ocrv6_small_det.onnx", "PP-OCRv6 Small Det"),
+            _ => ("pp-ocrv6_tiny_det.onnx", "PP-OCRv6 Tiny Det"),
+        };
+
+        let (rec_filename, dict_filename, rec_name) = match rec_id {
+            "medium" => ("pp-ocrv6_medium_rec.onnx", "ppocrv6_dict.txt", "PP-OCRv6 Medium Rec"),
+            "tiny" => ("pp-ocrv6_tiny_rec.onnx", "ppocrv6_tiny_dict.txt", "PP-OCRv6 Tiny Rec"),
+            _ => ("pp-ocrv6_small_rec.onnx", "ppocrv6_dict.txt", "PP-OCRv6 Small Rec"),
+        };
+
+        ensure_ocr_file_downloaded(det_filename, det_name, app_handle)?;
+        ensure_ocr_file_downloaded(rec_filename, rec_name, app_handle)?;
+        ensure_ocr_file_downloaded(dict_filename, rec_name, app_handle)?;
+
+        if let Some(app) = app_handle {
+            let _ = app.emit(
+                "ocr_download_progress",
+                OcrDownloadProgressPayload {
+                    model_key: det_id.to_string(),
+                    model_name: format!("{} + {}", det_name, rec_name),
+                    downloaded_bytes: 0,
+                    total_bytes: 0,
+                    pct: 100.0,
+                    status: "loading_into_memory".to_string(),
+                    error_msg: None,
+                },
+            );
+        }
+
         let dict_path = locate_or_create_dictionary("pl_50k.txt");
 
         let mut symspell = SymSpell::<UnicodeiStringStrategy>::default();
@@ -58,16 +275,28 @@ impl OcrEngine {
                 cudnn_conv_algo_search: None,
                 cudnn_conv_use_max_workspace: None,
             },
+            OrtExecutionProvider::CPU,
         ]);
 
-        let ocr = OAROCRBuilder::new(
-            "pp-ocrv6_tiny_det.onnx",
-            "pp-ocrv6_small_rec.onnx",
-            "ppocrv6_dict.txt",
-        )
-        .ort_session(ort_config)
-        .build()
-        .map_err(|e| anyhow!("Failed to initialize OCR engine: {:?}", e))?;
+        let ocr = OAROCRBuilder::new(det_filename, rec_filename, dict_filename)
+            .ort_session(ort_config)
+            .build()
+            .map_err(|e| anyhow!("Failed to initialize OCR engine with models ({}, {}): {:?}", det_filename, rec_filename, e))?;
+
+        if let Some(app) = app_handle {
+            let _ = app.emit(
+                "ocr_download_progress",
+                OcrDownloadProgressPayload {
+                    model_key: det_id.to_string(),
+                    model_name: format!("{} + {}", det_name, rec_name),
+                    downloaded_bytes: 0,
+                    total_bytes: 0,
+                    pct: 100.0,
+                    status: "ready".to_string(),
+                    error_msg: None,
+                },
+            );
+        }
 
         Ok(Self {
             ocr,

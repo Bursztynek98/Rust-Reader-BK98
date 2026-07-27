@@ -12,7 +12,7 @@ mod window_capture;
 use app_state::AppState;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, State};
 use window_capture::{get_available_targets, CaptureTargetInfo};
 
 #[tauri::command]
@@ -173,6 +173,60 @@ fn set_frame_diff_threshold(state: State<'_, Arc<AppState>>, threshold: u8) -> R
     Ok(())
 }
 
+#[tauri::command]
+fn get_ocr_detection_models() -> Result<Vec<ocr_engine::OcrModelInfo>, String> {
+    Ok(ocr_engine::get_detection_models_info())
+}
+
+#[tauri::command]
+fn get_ocr_recognition_models() -> Result<Vec<ocr_engine::OcrModelInfo>, String> {
+    Ok(ocr_engine::get_recognition_models_info())
+}
+
+#[tauri::command]
+fn set_ocr_models(
+    state: State<'_, Arc<AppState>>,
+    app_handle: AppHandle,
+    det_id: String,
+    rec_id: String,
+) -> Result<(), String> {
+    *state.ocr_det.lock() = det_id.clone();
+    *state.ocr_rec.lock() = rec_id.clone();
+    state.ocr_loaded.store(false, Ordering::Relaxed);
+
+    let state_clone = Arc::clone(&state);
+    let app_handle_clone = app_handle.clone();
+
+    std::thread::spawn(move || {
+        println!("[OCR] Dynamic model change: det={}, rec={}", det_id, rec_id);
+        match ocr_engine::OcrEngine::new_with_models(&det_id, &rec_id, Some(&app_handle_clone)) {
+            Ok(new_ocr) => {
+                *state_clone.ocr_engine.lock() = Some(new_ocr);
+                state_clone.ocr_loaded.store(true, Ordering::Relaxed);
+                println!("[OCR] ✓ Dynamic OCR reload complete.");
+            }
+            Err(e) => {
+                eprintln!("[OCR] ❌ Dynamic OCR load error: {:?}", e);
+                use tauri::Emitter;
+                let _ = app_handle_clone.emit(
+                    "ocr_download_progress",
+                    ocr_engine::OcrDownloadProgressPayload {
+                        model_key: det_id,
+                        model_name: "OCR Engine".to_string(),
+                        downloaded_bytes: 0,
+                        total_bytes: 0,
+                        pct: 0.0,
+                        status: "error".to_string(),
+                        error_msg: Some(format!("{:?}", e)),
+                    },
+                );
+            }
+        }
+    });
+
+    Ok(())
+}
+
 fn main() {
     let app_state = Arc::new(AppState::new());
     let state_for_worker = Arc::clone(&app_state);
@@ -193,6 +247,9 @@ fn main() {
             set_autocorrect_threshold,
             set_word_reject_threshold,
             set_frame_diff_threshold,
+            get_ocr_detection_models,
+            get_ocr_recognition_models,
+            set_ocr_models,
             get_tts_voices,
             set_tts_voice,
             set_tts_speed,

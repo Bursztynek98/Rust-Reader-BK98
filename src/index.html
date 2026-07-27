@@ -47,8 +47,9 @@
       <main class="main-grid">
         <!-- LEFT COLUMN: CONTROLS -->
         <section class="card panel-controls">
-          <h2 class="section-title">⚙️ Ustawienia Skanowania & TTS</h2>
+          <h2 class="section-title">⚙️ Ustawienia</h2>
 
+          <h3 class="subsection-title">⏱️ Interwał Skanowania</h3>
           <!-- SCAN INTERVAL -->
           <div class="control-group">
             <div class="control-label-row">
@@ -67,16 +68,20 @@
           <div class="control-group" style="margin-top: 6px;">
             <div class="control-label-row">
               <label for="slider-frame-diff-threshold">Czułość Różnicy Klatek (Diff):</label>
-              <span id="val-frame-diff-threshold" class="val-badge">2 (Wysoka - Domyślna)</span>
+              <span id="val-frame-diff-threshold" class="val-badge">2 (Domyślna)</span>
             </div>
             <input type="range" id="slider-frame-diff-threshold" min="0" max="10" step="1" value="2" />
             <div class="slider-ticks">
               <span>0 (Zawsze skanuj)</span>
               <span>1 (Ultra czuły)</span>
               <span>2 (Domyślnie)</span>
+              <span></span>
+              <span></span>
               <span>5+ (Niska)</span>
             </div>
           </div>
+
+          <hr class="divider" />
 
           <!-- AUTOCORRECT & NOISE REJECTION THRESHOLDS -->
           <h3 class="subsection-title">🪄 Auto-Korekta &amp; Filtrowanie Szumów</h3>
@@ -141,7 +146,7 @@
           <h3 class="subsection-title">🗣️ Synteza Mowy (TTS)</h3>
 
           <div class="control-group">
-            <label for="select-voice">Głos TTS:</label>
+            <label class="control-label-row" for="select-voice">Głos TTS:</label>
             <select id="select-voice" class="select-input">
               <option value="piper_jarvis" selected>Polski Jarvis (Piper VITS)</option>
               <option value="piper_zenski">Polski żeński (Piper VITS)</option>
@@ -185,6 +190,40 @@
               <span>100% (Normalna)</span>
               <span>200% (Wzmocnienie 2x)</span>
               <span>250%</span>
+            </div>
+          </div>
+
+          <hr class="divider" />
+          <!-- OCR MODEL SELECTION PANEL -->
+          <h3 class="subsection-title">🔍 Model Skanera (OCR)</h3>
+
+          <div class="control-group">
+            
+            <label class="control-label-row" for="select-ocr-det">Model Detekcji (Boxy):</label>
+            <select id="select-ocr-det" class="select-input">
+              <option value="pp-ocrv6_tiny_det" selected>pp-ocrv6_tiny_det</option>
+              <option value="pp-ocrv6_small_det">pp-ocrv6_small_det</option>
+              <option value="pp-ocrv6_medium_det">pp-ocrv6_medium_det</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label-row" for="select-ocr-rec">Model Rozpoznawania Tekstu:</label>
+            <select id="select-ocr-rec" class="select-input">
+              <option value="tiny">tiny: pp-ocrv6_tiny_rec.onnx (6.9k słownika)</option>
+              <option value="small" selected>small: pp-ocrv6_small_rec.onnx (18.7k słownika)</option>
+              <option value="medium">medium: pp-ocrv6_medium_rec.onnx (18.7k słownika)</option>
+            </select>
+
+            <!-- OCR DOWNLOAD & INITIALIZATION PROGRESS BAR -->
+            <div id="ocr-download-status" class="tts-download-status" style="display: none; margin-top: 0.5rem;">
+              <div class="tts-status-row">
+                <span id="ocr-status-text" class="tts-status-text">Pobieranie modelu OCR...</span>
+                <span id="ocr-status-pct" class="tts-status-pct">0 %</span>
+              </div>
+              <div class="tts-progress-bar-bg">
+                <div id="ocr-progress-bar-fill" class="tts-progress-bar-fill" style="width: 0%;"></div>
+              </div>
             </div>
           </div>
         </section>

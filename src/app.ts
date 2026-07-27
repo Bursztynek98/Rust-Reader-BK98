@@ -23,6 +23,24 @@ interface TtsDownloadProgressPayload {
   error_msg?: string;
 }
 
+interface OcrModelInfo {
+  id: string;
+  name: string;
+  filename: string;
+  is_downloaded: boolean;
+  file_size_mb: number;
+}
+
+interface OcrDownloadProgressPayload {
+  model_key: string;
+  model_name: string;
+  downloaded_bytes: number;
+  total_bytes: number;
+  pct: number;
+  status: string;
+  error_msg?: string;
+}
+
 interface WordInfo {
   raw: string;
   corrected: string;
@@ -106,6 +124,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const ttsStatusText = document.getElementById("tts-status-text") as HTMLSpanElement;
   const ttsStatusPct = document.getElementById("tts-status-pct") as HTMLSpanElement;
   const ttsProgressBarFill = document.getElementById("tts-progress-bar-fill") as HTMLDivElement;
+
+  const selectOcrDet = document.getElementById("select-ocr-det") as HTMLSelectElement;
+  const selectOcrRec = document.getElementById("select-ocr-rec") as HTMLSelectElement;
+  const ocrDownloadStatus = document.getElementById("ocr-download-status") as HTMLDivElement;
+  const ocrStatusText = document.getElementById("ocr-status-text") as HTMLSpanElement;
+  const ocrStatusPct = document.getElementById("ocr-status-pct") as HTMLSpanElement;
+  const ocrProgressBarFill = document.getElementById("ocr-progress-bar-fill") as HTMLDivElement;
   const sliderSpeed = document.getElementById("slider-speed") as HTMLInputElement;
   const valSpeed = document.getElementById("val-speed") as HTMLSpanElement;
 
@@ -333,9 +358,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     sliderFrameDiffThreshold.addEventListener("input", () => {
       const val = parseInt(sliderFrameDiffThreshold.value, 10);
       let label = `${val} bit`;
-      if (val === 0) label = "0 (Wyłączone - Skanuj każdą)";
-      else if (val === 1) label = "1 (Ultra czuły - Czarny ekran)";
-      else if (val === 2) label = "2 (Domyślnie wysoka)";
+      if (val === 0) label = "0 (Skanuj każdą)";
+      else if (val === 1) label = "1 (Czarny ekran)";
+      else if (val === 2) label = "2 (Domyślnie)";
       else if (val >= 5) label = `${val} (Niska czułość)`;
 
       if (valFrameDiffThreshold) valFrameDiffThreshold.textContent = label;
@@ -421,6 +446,89 @@ document.addEventListener("DOMContentLoaded", async () => {
       ttsDownloadStatus.style.display = "flex";
       if (ttsStatusText) ttsStatusText.textContent = `❌ Błąd: ${payload.error_msg || "Nieudane pobieranie"}`;
       if (ttsStatusPct) ttsStatusPct.textContent = "ERR";
+    }
+  });
+
+  // 4b. OCR Model Controls & Download Status
+  async function refreshOcrModelsList() {
+    try {
+      const detModels = await invoke<OcrModelInfo[]>("get_ocr_detection_models");
+      const recModels = await invoke<OcrModelInfo[]>("get_ocr_recognition_models");
+
+      if (selectOcrDet) {
+        const curDet = selectOcrDet.value || "pp-ocrv6_tiny_det";
+        selectOcrDet.innerHTML = "";
+        detModels.forEach((m) => {
+          const opt = document.createElement("option");
+          opt.value = m.id;
+          opt.textContent = m.is_downloaded
+            ? `✅ ${m.name}`
+            : `☁️ ${m.name} (${m.file_size_mb} MB)`;
+          if (m.id === curDet) opt.selected = true;
+          selectOcrDet.appendChild(opt);
+        });
+      }
+
+      if (selectOcrRec) {
+        const curRec = selectOcrRec.value || "small";
+        selectOcrRec.innerHTML = "";
+        recModels.forEach((m) => {
+          const opt = document.createElement("option");
+          opt.value = m.id;
+          opt.textContent = m.is_downloaded
+            ? `✅ ${m.name}`
+            : `☁️ ${m.name} (${m.file_size_mb} MB)`;
+          if (m.id === curRec) opt.selected = true;
+          selectOcrRec.appendChild(opt);
+        });
+      }
+    } catch (e) {
+      console.error("Failed to load OCR models info:", e);
+    }
+  }
+
+  await refreshOcrModelsList();
+
+  function triggerOcrModelChange() {
+    if (!selectOcrDet || !selectOcrRec) return;
+    invoke("set_ocr_models", {
+      detId: selectOcrDet.value,
+      recId: selectOcrRec.value,
+    });
+  }
+
+  if (selectOcrDet) selectOcrDet.addEventListener("change", triggerOcrModelChange);
+  if (selectOcrRec) selectOcrRec.addEventListener("change", triggerOcrModelChange);
+
+  await listen<OcrDownloadProgressPayload>("ocr_download_progress", (event) => {
+    const payload = event.payload;
+    if (!ocrDownloadStatus) return;
+
+    if (payload.status === "downloading") {
+      ocrDownloadStatus.style.display = "flex";
+      const downloadedMB = (payload.downloaded_bytes / (1024 * 1024)).toFixed(1);
+      const totalMB = payload.total_bytes > 0 ? (payload.total_bytes / (1024 * 1024)).toFixed(1) : "?";
+      if (ocrStatusText) ocrStatusText.textContent = `☁️ Pobieranie: ${downloadedMB} / ${totalMB} MB (${payload.model_name})`;
+      if (ocrStatusPct) ocrStatusPct.textContent = `${Math.round(payload.pct)} %`;
+      if (ocrProgressBarFill) ocrProgressBarFill.style.width = `${payload.pct}%`;
+    } else if (payload.status === "loading_into_memory") {
+      ocrDownloadStatus.style.display = "flex";
+      if (ocrStatusText) ocrStatusText.textContent = "⚡ Inicjalizacja modelu OCR w GPU/CPU...";
+      if (ocrStatusPct) ocrStatusPct.textContent = "100 %";
+      if (ocrProgressBarFill) ocrProgressBarFill.style.width = "100%";
+    } else if (payload.status === "ready") {
+      ocrDownloadStatus.style.display = "flex";
+      if (ocrStatusText) ocrStatusText.textContent = "✅ Model OCR gotowy do użycia!";
+      if (ocrStatusPct) ocrStatusPct.textContent = "100 %";
+      if (ocrProgressBarFill) ocrProgressBarFill.style.width = "100%";
+      setTimeout(() => {
+        if (ocrDownloadStatus) ocrDownloadStatus.style.display = "none";
+      }, 2500);
+      refreshOcrModelsList();
+    } else if (payload.status === "error") {
+      ocrDownloadStatus.style.display = "flex";
+      if (ocrStatusText) ocrStatusText.textContent = `❌ Błąd OCR: ${payload.error_msg || "Nieudane pobieranie"}`;
+      if (ocrStatusPct) ocrStatusPct.textContent = "ERR";
     }
   });
 

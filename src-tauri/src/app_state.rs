@@ -64,6 +64,8 @@ pub struct AppState {
     pub target_id: Arc<Mutex<String>>,
     pub crop_region: Arc<Mutex<CropRegion>>,
     pub ocr_filters: Arc<Mutex<Vec<String>>>,
+    pub ocr_det: Arc<Mutex<String>>,
+    pub ocr_rec: Arc<Mutex<String>>,
     pub tts_voice: Arc<Mutex<String>>,
     pub tts_speed: Arc<Mutex<f32>>,
     pub tts_volume: Arc<Mutex<f32>>,
@@ -87,6 +89,8 @@ impl AppState {
         let target_id = Arc::new(Mutex::new("mon_0".to_string()));
         let crop_region = Arc::new(Mutex::new(CropRegion::default()));
         let ocr_filters = Arc::new(Mutex::new(vec!["padding20".to_string(), "contrast".to_string()]));
+        let ocr_det = Arc::new(Mutex::new("pp-ocrv6_tiny_det".to_string()));
+        let ocr_rec = Arc::new(Mutex::new("small".to_string()));
         let tts_voice = Arc::new(Mutex::new("piper_jarvis".to_string()));
         let tts_speed = Arc::new(Mutex::new(1.0f32));
         let tts_volume = Arc::new(Mutex::new(1.0f32));
@@ -107,6 +111,8 @@ impl AppState {
             target_id,
             crop_region,
             ocr_filters,
+            ocr_det,
+            ocr_rec,
             tts_voice,
             tts_speed,
             tts_volume,
@@ -123,9 +129,12 @@ impl AppState {
         let state_for_init = Arc::clone(self);
 
         // 1. Initialize OCR & TTS engines asynchronously in background
+        let app_handle_ocr = app_handle.clone();
         thread::spawn(move || {
-            println!("[Worker] Async loading OCR engine...");
-            match OcrEngine::new() {
+            let det_id = state_for_init.ocr_det.lock().clone();
+            let rec_id = state_for_init.ocr_rec.lock().clone();
+            println!("[Worker] Async loading OCR engine (det: {}, rec: {})...", det_id, rec_id);
+            match OcrEngine::new_with_models(&det_id, &rec_id, Some(&app_handle_ocr)) {
                 Ok(ocr) => {
                     *state_for_init.ocr_engine.lock() = Some(ocr);
                     state_for_init.ocr_loaded.store(true, Ordering::Relaxed);
