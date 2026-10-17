@@ -237,6 +237,22 @@ fn skip_tts(state: State<'_, Arc<AppState>>) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn get_audio_output_devices() -> Result<Vec<audio_player::AudioDeviceInfo>, String> {
+    Ok(audio_player::get_output_devices())
+}
+
+#[tauri::command]
+fn set_audio_output_device(state: State<'_, Arc<AppState>>, device_name: Option<String>) -> Result<(), String> {
+    let dev = device_name.filter(|s| !s.is_empty() && s != "default");
+    *state.audio_device.lock() = dev.clone();
+    let player_guard = state.audio_player.lock();
+    if let Some(ref player) = *player_guard {
+        player.set_device(dev).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 fn main() {
     let app_state = Arc::new(AppState::new());
     let state_for_worker = Arc::clone(&app_state);
@@ -265,7 +281,9 @@ fn main() {
             set_tts_speed,
             set_tts_volume,
             toggle_pause,
-            skip_tts
+            skip_tts,
+            get_audio_output_devices,
+            set_audio_output_device
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

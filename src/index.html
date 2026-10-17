@@ -25,9 +25,21 @@
         </div>
 
         <div class="header-controls">
+          <!-- AUDIO OUTPUT DEVICE SELECTION -->
+          <div class="audio-device-wrapper">
+            <label for="audio-device-select">Wyjście Audio:</label>
+            <select id="audio-device-select" class="select-input select-audio" title="Wybierz urządzenie do odtwarzania głosu">
+              <option value="">Domyślne systemowe</option>
+            </select>
+            <button id="btn-refresh-audio-devices" class="btn btn-secondary" title="Odśwież listę urządzeń audio">
+              🔄
+            </button>
+          </div>
+
+          <!-- SCREEN / WINDOW TARGET SELECTION -->
           <div class="target-select-wrapper">
             <label for="target-select">Źródło Obrazu:</label>
-            <select id="target-select" class="select-input">
+            <select id="target-select" class="select-input select-target" title="Wybierz ekran lub okno do skanowania">
               <option value="">Wczytywanie okien...</option>
             </select>
             <button id="btn-refresh-targets" class="btn btn-secondary" title="Odśwież listę okien">

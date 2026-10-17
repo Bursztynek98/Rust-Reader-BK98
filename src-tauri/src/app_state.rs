@@ -75,6 +75,7 @@ pub struct AppState {
     pub tts_speed: Arc<Mutex<f32>>,
     pub tts_volume: Arc<Mutex<f32>>,
     pub last_raw_text: Arc<Mutex<String>>,
+    pub audio_device: Arc<Mutex<Option<String>>>,
 
     pub ocr_loaded: Arc<AtomicBool>,
     pub tts_loaded: Arc<AtomicBool>,
@@ -100,6 +101,7 @@ impl AppState {
         let tts_speed = Arc::new(Mutex::new(1.0f32));
         let tts_volume = Arc::new(Mutex::new(1.0f32));
         let last_raw_text = Arc::new(Mutex::new(String::new()));
+        let audio_device = Arc::new(Mutex::new(None));
 
         let ocr_loaded = Arc::new(AtomicBool::new(false));
         let tts_loaded = Arc::new(AtomicBool::new(false));
@@ -122,6 +124,7 @@ impl AppState {
             tts_speed,
             tts_volume,
             last_raw_text,
+            audio_device,
             ocr_loaded,
             tts_loaded,
             ocr_engine: Arc::new(Mutex::new(None)),

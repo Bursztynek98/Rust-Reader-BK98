@@ -13,6 +13,11 @@ interface VoiceInfo {
   is_downloaded: boolean;
 }
 
+interface AudioDeviceInfo {
+  name: string;
+  is_default: boolean;
+}
+
 interface TtsDownloadProgressPayload {
   voice_key: string;
   voice_name: string;
@@ -84,6 +89,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnRefreshTargets = document.getElementById("btn-refresh-targets") as HTMLButtonElement;
   const btnPause = document.getElementById("btn-pause") as HTMLButtonElement;
   const pauseText = document.getElementById("pause-text") as HTMLSpanElement;
+
+  const audioDeviceSelect = document.getElementById("audio-device-select") as HTMLSelectElement;
+  const btnRefreshAudioDevices = document.getElementById("btn-refresh-audio-devices") as HTMLButtonElement;
 
   const btnSkip = document.getElementById("btn-skip") as HTMLButtonElement;
   const btnSkipActive = document.getElementById("btn-skip-active") as HTMLButtonElement;
@@ -254,6 +262,55 @@ document.addEventListener("DOMContentLoaded", async () => {
   targetSelect.addEventListener("change", async () => {
     await invoke("set_target", { targetId: targetSelect.value });
   });
+
+  // 1b. Fetch available audio output devices
+  async function refreshAudioDevices() {
+    if (!audioDeviceSelect) return;
+    try {
+      const devices = await invoke<AudioDeviceInfo[]>("get_audio_output_devices");
+      const savedDevice = localStorage.getItem("rust_reader_audio_device") || "";
+      const currentVal = audioDeviceSelect.value || savedDevice;
+
+      audioDeviceSelect.innerHTML = "";
+
+      const defaultOpt = document.createElement("option");
+      defaultOpt.value = "";
+      defaultOpt.textContent = "🔊 Domyślne systemowe";
+      audioDeviceSelect.appendChild(defaultOpt);
+
+      devices.forEach((dev) => {
+        const opt = document.createElement("option");
+        opt.value = dev.name;
+        opt.textContent = `${dev.name}${dev.is_default ? " (Domyślne)" : ""}`;
+        audioDeviceSelect.appendChild(opt);
+      });
+
+      const hasMatch = Array.from(audioDeviceSelect.options).some((o) => o.value === currentVal);
+      if (hasMatch) {
+        audioDeviceSelect.value = currentVal;
+      } else {
+        audioDeviceSelect.value = "";
+      }
+
+      await invoke("set_audio_output_device", { deviceName: audioDeviceSelect.value || null });
+    } catch (e) {
+      console.error("Failed to load audio devices:", e);
+    }
+  }
+
+  if (btnRefreshAudioDevices) {
+    btnRefreshAudioDevices.addEventListener("click", refreshAudioDevices);
+  }
+
+  if (audioDeviceSelect) {
+    audioDeviceSelect.addEventListener("change", async () => {
+      const selected = audioDeviceSelect.value;
+      localStorage.setItem("rust_reader_audio_device", selected);
+      await invoke("set_audio_output_device", { deviceName: selected || null });
+    });
+  }
+
+  await refreshAudioDevices();
 
   // 2. Crop Sliders & Box Model Handling
   function updateCropParams() {
