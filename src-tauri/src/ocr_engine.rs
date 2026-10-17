@@ -568,10 +568,28 @@ fn binarize_fast(gray: &GrayImage, threshold: u8) -> GrayImage {
 }
 
 fn locate_or_create_dictionary(filename: &str) -> String {
+    // 1. Check in the same directory as the running executable
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let candidate = exe_dir.join(filename);
+            if candidate.exists() && is_valid_dict_file(candidate.to_str().unwrap_or("")) {
+                return candidate.to_string_lossy().to_string();
+            }
+        }
+    }
+
+    // 2. Check current working directory
     if Path::new(filename).exists() && is_valid_dict_file(filename) {
         return filename.to_string();
     }
 
+    // 3. Check src-tauri subfolder if running from project root
+    let subfolder_path = format!("src-tauri/{}", filename);
+    if Path::new(&subfolder_path).exists() && is_valid_dict_file(&subfolder_path) {
+        return subfolder_path;
+    }
+
+    // 4. Check parent directory if running inside src-tauri
     let parent_path = format!("../{}", filename);
     if Path::new(&parent_path).exists() && is_valid_dict_file(&parent_path) {
         return parent_path;
