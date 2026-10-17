@@ -43,13 +43,26 @@ jobs:
           Copy-Item "src-tauri/pl_50k.txt" -Destination "release-assets/pl_50k.txt"
           Compress-Archive -Path "release-assets/rust-reader.exe", "release-assets/pl_50k.txt" -DestinationPath "release-assets/rust-reader-windows-x64.zip"
 
+      - name: Determine Version Tag
+        id: vars
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag -or $tag -eq "main" -or $tag -eq "master") {
+            $tag = "${{ inputs.version }}"
+          }
+          if (-not $tag) {
+            $tag = "v0.1.0"
+          }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version || 'v0.1.0' }}
-          name: 'Rust Reader ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.version || 'v0.1.0' }}'
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: Rust Reader ${{ steps.vars.outputs.tag }}
           body: |
             ## 🦀 Rust Reader - Oficjalne Wydanie
             
