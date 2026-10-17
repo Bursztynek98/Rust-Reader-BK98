@@ -40,6 +40,9 @@
             <span class="status-dot"></span>
             <span id="pause-text">▶️ START SKANOWANIA</span>
           </button>
+          <button id="btn-skip" class="btn btn-skip" title="Pomiń obecnie czytany napis i wyczyść kolejkę TTS">
+            <span>⏭️ POMIŃ</span>
+          </button>
         </div>
       </header>
 
@@ -349,6 +352,7 @@
             <div class="box-header">
               <span class="box-label">OSTATNIO ODCZYTANY NAPIS</span>
               <div style="display: flex; align-items: center; gap: 8px;">
+                <button id="btn-skip-active" class="btn-skip-sm" title="Pomiń obecnie odtwarzany napis">⏭️ POMIŃ</button>
                 <span id="active-confidence" class="val-badge" style="background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);">Pewność: --%</span>
                 <span id="active-timestamp" class="timestamp">--:--:--</span>
               </div>

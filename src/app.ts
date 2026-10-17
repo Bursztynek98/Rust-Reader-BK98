@@ -65,6 +65,7 @@ interface TelemetryData {
   scan_interval_ms: number;
   is_paused: boolean;
   audio_queue_len: number;
+  audio_queue_text_len: number;
   current_voice: string;
   base_speed: number;
   effective_speed: number;
@@ -83,6 +84,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnRefreshTargets = document.getElementById("btn-refresh-targets") as HTMLButtonElement;
   const btnPause = document.getElementById("btn-pause") as HTMLButtonElement;
   const pauseText = document.getElementById("pause-text") as HTMLSpanElement;
+
+  const btnSkip = document.getElementById("btn-skip") as HTMLButtonElement;
+  const btnSkipActive = document.getElementById("btn-skip-active") as HTMLButtonElement;
 
   const badgeOcr = document.getElementById("badge-ocr") as HTMLSpanElement;
   const badgeTts = document.getElementById("badge-tts") as HTMLSpanElement;
@@ -154,6 +158,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const metricFilterTime = document.getElementById("metric-filter-time") as HTMLSpanElement;
   const metricOcrTime = document.getElementById("metric-ocr-time") as HTMLSpanElement;
   const metricTtsTime = document.getElementById("metric-tts-time") as HTMLSpanElement;
+  const metricQueue = document.getElementById("metric-queue") as HTMLSpanElement;
   const metricSpeed = document.getElementById("metric-speed") as HTMLSpanElement;
 
   const historyTbody = document.getElementById("history-tbody") as HTMLTableSectionElement;
@@ -560,6 +565,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  // 5b. Skip TTS Button
+  async function handleSkip() {
+    try {
+      await invoke("skip_tts");
+      if (textCorrected) {
+        textCorrected.style.opacity = "0.4";
+        setTimeout(() => {
+          if (textCorrected) textCorrected.style.opacity = "1";
+        }, 250);
+      }
+    } catch (e) {
+      console.error("Failed to skip TTS:", e);
+    }
+  }
+
+  if (btnSkip) btnSkip.addEventListener("click", handleSkip);
+  if (btnSkipActive) btnSkipActive.addEventListener("click", handleSkip);
+
   // 6. Tauri Event Listeners
   await listen<{ preview_base64: string }>("scan_preview", (event) => {
     if (event.payload && event.payload.preview_base64) {
@@ -575,12 +598,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (metricOcrTime) metricOcrTime.textContent = `${data.ocr_time_ms.toFixed(1)} ms`;
     if (metricTtsTime) metricTtsTime.textContent = `${data.tts_time_ms.toFixed(1)} ms`;
 
-    metricSpeed.textContent = `${data.effective_speed.toFixed(1)}x (${data.audio_queue_len} q)`;
+    if (metricQueue) {
+      if (data.audio_queue_text_len > 0) {
+        metricQueue.textContent = `${data.audio_queue_len} (${data.audio_queue_text_len} zn.)`;
+      } else {
+        metricQueue.textContent = `${data.audio_queue_len}`;
+      }
+    }
 
-    if (data.audio_queue_len > 1) {
-      metricSpeed.style.color = "#f43f5e";
-    } else {
-      metricSpeed.style.color = "#06b6d4";
+    if (metricSpeed) {
+      if (data.effective_speed > data.base_speed + 0.05) {
+        metricSpeed.textContent = `⚡ ${data.effective_speed.toFixed(1)}x`;
+        metricSpeed.style.color = "#f43f5e";
+      } else {
+        metricSpeed.textContent = `${data.effective_speed.toFixed(1)}x`;
+        metricSpeed.style.color = "#06b6d4";
+      }
     }
 
     if (data.ocr_loaded) {

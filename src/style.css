@@ -287,6 +287,61 @@ html, body {
   box-shadow: 0 0 8px var(--accent-emerald);
 }
 
+/* SKIP BUTTON (HEADER) */
+.btn-skip {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(244, 63, 94, 0.2));
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fde68a;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+}
+
+.btn-skip:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(244, 63, 94, 0.35));
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
+  border-color: rgba(245, 158, 11, 0.7);
+  transform: translateY(-1px);
+}
+
+.btn-skip:active {
+  transform: scale(0.96);
+}
+
+/* SMALL SKIP BUTTON (ACTIVE SUBTITLE PANEL) */
+.btn-skip-sm {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fcd34d;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-skip-sm:hover {
+  background: rgba(245, 158, 11, 0.3);
+  border-color: rgba(245, 158, 11, 0.65);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-skip-sm:active {
+  transform: scale(0.95);
+}
+
 /* MAIN GRID LAYOUT OPTIMIZED FOR 740p */
 .main-grid {
   display: grid;

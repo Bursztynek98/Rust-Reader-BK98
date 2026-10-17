@@ -227,6 +227,16 @@ fn set_ocr_models(
     Ok(())
 }
 
+#[tauri::command]
+fn skip_tts(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    *state.last_raw_text.lock() = String::new();
+    let player_guard = state.audio_player.lock();
+    if let Some(ref player) = *player_guard {
+        player.skip().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 fn main() {
     let app_state = Arc::new(AppState::new());
     let state_for_worker = Arc::clone(&app_state);
@@ -254,7 +264,8 @@ fn main() {
             set_tts_voice,
             set_tts_speed,
             set_tts_volume,
-            toggle_pause
+            toggle_pause,
+            skip_tts
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-use crate::audio_player::{AudioItem, AudioPlayer};
+use crate::audio_player::{calculate_player_speed, AudioItem, AudioPlayer};
 use crate::diff_filter::{has_image_changed, has_significant_change, FrameHash};
 use crate::ocr_engine::OcrEngine;
 use crate::tts_engine::TtsEngine;
@@ -42,6 +42,7 @@ pub struct TelemetryData {
     pub scan_interval_ms: u16,
     pub is_paused: bool,
     pub audio_queue_len: usize,
+    pub audio_queue_text_len: usize,
     pub current_voice: String,
     pub base_speed: f32,
     pub effective_speed: f32,
@@ -52,6 +53,10 @@ pub struct TelemetryData {
     pub filter_time_ms: f32,
     pub ocr_time_ms: f32,
     pub tts_time_ms: f32,
+}
+
+pub fn calculate_linear_speed(base_speed: f32, qlen: usize, qtext: usize) -> f32 {
+    base_speed * calculate_player_speed(qlen, qtext)
 }
 
 pub struct AppState {
@@ -213,15 +218,14 @@ impl AppState {
                                         let text_to_speak = ocr_res.corrected_text.clone();
                                         drop(last_txt);
 
-                                        let qlen = state.get_audio_queue_len();
                                         let b_speed = *state.tts_speed.lock();
-                                        let eff_speed = if qlen > 1 { (b_speed * 2.5).min(3.5) } else { b_speed };
 
                                         let tts_guard = state.tts_engine.lock();
 
                                         if is_tts_ready {
                                             if let Some(ref tts) = *tts_guard {
-                                                if let Ok(audio) = tts.generate_speech(&text_to_speak, eff_speed) {
+                                                // TTS synthesis speed is strictly controlled by user slider (b_speed)
+                                                if let Ok(audio) = tts.generate_speech(&text_to_speak, b_speed) {
                                                     last_tts_time = audio.duration_ms;
 
                                                     let player_guard = state.audio_player.lock();
@@ -229,6 +233,7 @@ impl AppState {
                                                         let _ = player.enqueue(AudioItem {
                                                             samples: audio.samples,
                                                             sample_rate: audio.sample_rate,
+                                                            text_len: text_to_speak.chars().count(),
                                                         });
                                                     }
                                                 }
@@ -259,13 +264,15 @@ impl AppState {
             }
 
                 let qlen = state.get_audio_queue_len();
+                let qtext = state.get_audio_queue_text_len();
                 let b_speed = *state.tts_speed.lock();
-                let eff_speed = if qlen > 1 { (b_speed * 2.5).min(3.5) } else { b_speed };
+                let eff_speed = calculate_linear_speed(b_speed, qlen, qtext);
 
                 let _ = app_handle.emit("telemetry_update", TelemetryData {
                     scan_interval_ms: interval,
                     is_paused: paused,
                     audio_queue_len: qlen,
+                    audio_queue_text_len: qtext,
                     current_voice: state.tts_voice.lock().clone(),
                     base_speed: b_speed,
                     effective_speed: eff_speed,
@@ -291,6 +298,15 @@ impl AppState {
             0
         }
     }
+
+    pub fn get_audio_queue_text_len(&self) -> usize {
+        let player = self.audio_player.lock();
+        if let Some(ref p) = *player {
+            p.get_queue_text_len()
+        } else {
+            0
+        }
+    }
 }
 
 fn chrono_now_str() -> String {
@@ -305,3 +321,33 @@ fn chrono_now_str() -> String {
         "00:00:00".to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_linear_speed_normal() {
+        let base = 1.0;
+        // Empty or 1 short item
+        assert_eq!(calculate_linear_speed(base, 0, 0), 1.0);
+        assert_eq!(calculate_linear_speed(base, 1, 30), 1.0);
+    }
+
+    #[test]
+    fn test_calculate_linear_speed_scaling() {
+        let base = 1.0;
+        // 2 items, 80 chars total
+        let s2 = calculate_linear_speed(base, 2, 80);
+        assert!(s2 > 1.0);
+
+        // 3 items, 150 chars total
+        let s3 = calculate_linear_speed(base, 3, 150);
+        assert!(s3 > s2);
+
+        // Capped at max 2.0
+        let s_max = calculate_linear_speed(base, 10, 1000);
+        assert_eq!(s_max, 2.0);
+    }
+}
+
