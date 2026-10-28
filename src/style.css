@@ -1043,3 +1043,9 @@ input[type="range"] {
   color: var(--accent-cyan);
   white-space: nowrap;
 }
+
+.val-badge.badge-connected {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.4);
+}

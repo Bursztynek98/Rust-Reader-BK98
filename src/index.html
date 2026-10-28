@@ -208,6 +208,24 @@
             </div>
           </div>
 
+          <!-- DISCORD STREAM (CLEAN & COMPACT) -->
+          <div class="control-group" style="margin-top: 10px;">
+            <div class="control-label-row">
+              <label for="btn-open-discord-stream">Stream Discord (Karta Audio):</label>
+              <span id="discord-stream-badge" class="val-badge">⚪ Brak karty</span>
+            </div>
+            <button id="btn-open-discord-stream" class="btn btn-secondary" style="width: 100%; margin-top: 4px; padding: 6px 10px; font-size: 12px; justify-content: center; gap: 6px;" title="Otwórz kartę w oknie przeglądarki, które streamujesz na Discordzie">
+              <span>🌐 Otwórz kartę audio dla Discorda</span>
+            </button>
+          </div>
+
+          <div class="checkbox-group" style="margin-top: 6px;">
+            <label class="checkbox-label" title="Automatycznie wycisza lokalne odtwarzanie, gdy karta w przeglądarce jest aktywna (brak echa w słuchawkach)">
+              <input type="checkbox" id="chk-discord-mute-local" checked />
+              <span>Wycisz aplikację przy aktywnej karcie (brak echa)</span>
+            </label>
+          </div>
+
           <hr class="divider" />
           <!-- OCR MODEL SELECTION PANEL -->
           <h3 class="subsection-title">🔍 Model Skanera (OCR)</h3>

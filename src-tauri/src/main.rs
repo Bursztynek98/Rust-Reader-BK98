@@ -5,6 +5,7 @@ mod app_state;
 mod audio_player;
 mod box_filter;
 mod diff_filter;
+mod discord_stream;
 mod ocr_engine;
 mod tts_engine;
 mod window_capture;
@@ -230,6 +231,7 @@ fn set_ocr_models(
 #[tauri::command]
 fn skip_tts(state: State<'_, Arc<AppState>>) -> Result<(), String> {
     *state.last_raw_text.lock() = String::new();
+    state.discord_stream.skip();
     let player_guard = state.audio_player.lock();
     if let Some(ref player) = *player_guard {
         player.skip().map_err(|e| e.to_string())?;
@@ -250,6 +252,29 @@ fn set_audio_output_device(state: State<'_, Arc<AppState>>, device_name: Option<
     if let Some(ref player) = *player_guard {
         player.set_device(dev).map_err(|e| e.to_string())?;
     }
+    Ok(())
+}
+
+#[tauri::command]
+fn get_discord_stream_status(state: State<'_, Arc<AppState>>) -> Result<discord_stream::DiscordStreamStatus, String> {
+    Ok(state.discord_stream.get_status())
+}
+
+#[tauri::command]
+fn set_discord_stream_enabled(state: State<'_, Arc<AppState>>, enabled: bool) -> Result<(), String> {
+    state.discord_stream.set_enabled(enabled);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_discord_stream_mute_local(state: State<'_, Arc<AppState>>, mute: bool) -> Result<(), String> {
+    state.discord_stream.set_mute_local(mute);
+    Ok(())
+}
+
+#[tauri::command]
+fn open_discord_stream_browser(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    state.discord_stream.open_browser();
     Ok(())
 }
 
@@ -283,7 +308,11 @@ fn main() {
             toggle_pause,
             skip_tts,
             get_audio_output_devices,
-            set_audio_output_device
+            set_audio_output_device,
+            get_discord_stream_status,
+            set_discord_stream_enabled,
+            set_discord_stream_mute_local,
+            open_discord_stream_browser
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

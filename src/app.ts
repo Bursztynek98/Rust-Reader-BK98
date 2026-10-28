@@ -66,6 +66,14 @@ interface SubtitleHistoryEntry {
   tts_time_ms: number;
 }
 
+interface DiscordStreamStatus {
+  is_enabled: boolean;
+  mute_local: boolean;
+  connected_clients: number;
+  port: number;
+  url: string;
+}
+
 interface TelemetryData {
   scan_interval_ms: number;
   is_paused: boolean;
@@ -81,6 +89,10 @@ interface TelemetryData {
   filter_time_ms: number;
   ocr_time_ms: number;
   tts_time_ms: number;
+  discord_stream_clients: number;
+  discord_stream_enabled: boolean;
+  discord_stream_mute_local: boolean;
+  discord_stream_port: number;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -175,6 +187,51 @@ document.addEventListener("DOMContentLoaded", async () => {
   const chkTogglePreview = document.getElementById("chk-toggle-preview") as HTMLInputElement;
   const previewDisabledPlaceholder = document.getElementById("preview-disabled-placeholder") as HTMLDivElement;
   const liveTag = document.getElementById("live-tag") as HTMLSpanElement;
+
+  const btnOpenDiscordStream = document.getElementById("btn-open-discord-stream") as HTMLButtonElement;
+  const discordStreamBadge = document.getElementById("discord-stream-badge") as HTMLSpanElement;
+  const discordStreamPortInfo = document.getElementById("discord-stream-port-info") as HTMLSpanElement;
+  const chkDiscordMuteLocal = document.getElementById("chk-discord-mute-local") as HTMLInputElement;
+  const chkDiscordEnabled = document.getElementById("chk-discord-enabled") as HTMLInputElement;
+
+  if (btnOpenDiscordStream) {
+    btnOpenDiscordStream.addEventListener("click", async () => {
+      try {
+        await invoke("open_discord_stream_browser");
+      } catch (e) {
+        console.error("Failed to open Discord stream companion in browser:", e);
+      }
+    });
+  }
+
+  if (chkDiscordEnabled) {
+    chkDiscordEnabled.addEventListener("change", async () => {
+      try {
+        await invoke("set_discord_stream_enabled", { enabled: chkDiscordEnabled.checked });
+      } catch (e) {
+        console.error("Failed to set discord stream enabled:", e);
+      }
+    });
+  }
+
+  if (chkDiscordMuteLocal) {
+    chkDiscordMuteLocal.addEventListener("change", async () => {
+      try {
+        await invoke("set_discord_stream_mute_local", { mute: chkDiscordMuteLocal.checked });
+      } catch (e) {
+        console.error("Failed to set discord stream mute local:", e);
+      }
+    });
+  }
+
+  // Initial Discord Stream status
+  try {
+    invoke<DiscordStreamStatus>("get_discord_stream_status").then((status) => {
+      if (chkDiscordEnabled) chkDiscordEnabled.checked = status.is_enabled;
+      if (chkDiscordMuteLocal) chkDiscordMuteLocal.checked = status.mute_local;
+      if (discordStreamPortInfo) discordStreamPortInfo.textContent = `Port: ${status.port}`;
+    });
+  } catch (e) {}
 
   let isWindowFocused = true;
 
@@ -691,6 +748,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       badgeTts.textContent = "TTS: Ładowanie...";
       badgeTts.classList.remove("ready");
       badgeTts.classList.add("loading");
+    }
+
+    if (discordStreamBadge) {
+      if (data.discord_stream_clients > 0) {
+        discordStreamBadge.className = "val-badge badge-connected";
+        discordStreamBadge.textContent = `🟢 Aktywne (${data.discord_stream_clients})`;
+      } else {
+        discordStreamBadge.className = "val-badge";
+        discordStreamBadge.textContent = "⚪ Brak karty";
+      }
     }
   });
 

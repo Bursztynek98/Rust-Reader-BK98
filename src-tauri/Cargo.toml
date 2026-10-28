@@ -34,6 +34,9 @@ hound = "3.5.1"
 # Window / Screen Capture
 xcap = "0.0.14"
 
+# Local Companion Web Server (Discord Stream)
+axum = { version = "0.7", features = ["ws"] }
+
 [profile.release]
 opt-level = 3
 lto = true

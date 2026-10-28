@@ -53,6 +53,10 @@ pub struct TelemetryData {
     pub filter_time_ms: f32,
     pub ocr_time_ms: f32,
     pub tts_time_ms: f32,
+    pub discord_stream_clients: usize,
+    pub discord_stream_enabled: bool,
+    pub discord_stream_mute_local: bool,
+    pub discord_stream_port: u16,
 }
 
 pub fn calculate_linear_speed(base_speed: f32, qlen: usize, qtext: usize) -> f32 {
@@ -82,6 +86,7 @@ pub struct AppState {
     pub ocr_engine: Arc<Mutex<Option<OcrEngine>>>,
     pub tts_engine: Arc<Mutex<Option<TtsEngine>>>,
     pub audio_player: Arc<Mutex<Option<AudioPlayer>>>,
+    pub discord_stream: Arc<crate::discord_stream::DiscordStreamManager>,
 }
 
 impl AppState {
@@ -107,6 +112,7 @@ impl AppState {
         let tts_loaded = Arc::new(AtomicBool::new(false));
 
         let audio_player = AudioPlayer::new().ok();
+        let discord_stream = Arc::new(crate::discord_stream::DiscordStreamManager::new(4848));
 
         Self {
             is_paused,
@@ -130,6 +136,7 @@ impl AppState {
             ocr_engine: Arc::new(Mutex::new(None)),
             tts_engine: Arc::new(Mutex::new(None)),
             audio_player: Arc::new(Mutex::new(audio_player)),
+            discord_stream,
         }
     }
 
@@ -231,13 +238,18 @@ impl AppState {
                                                 if let Ok(audio) = tts.generate_speech(&text_to_speak, b_speed) {
                                                     last_tts_time = audio.duration_ms;
 
-                                                    let player_guard = state.audio_player.lock();
-                                                    if let Some(ref player) = *player_guard {
-                                                        let _ = player.enqueue(AudioItem {
-                                                            samples: audio.samples,
-                                                            sample_rate: audio.sample_rate,
-                                                            text_len: text_to_speak.chars().count(),
-                                                        });
+                                                    let stream_sent = state.discord_stream.broadcast_audio(&audio.samples, audio.sample_rate);
+                                                    let mute_local = state.discord_stream.should_mute_local();
+
+                                                    if !mute_local || !stream_sent {
+                                                        let player_guard = state.audio_player.lock();
+                                                        if let Some(ref player) = *player_guard {
+                                                            let _ = player.enqueue(AudioItem {
+                                                                samples: audio.samples,
+                                                                sample_rate: audio.sample_rate,
+                                                                text_len: text_to_speak.chars().count(),
+                                                            });
+                                                        }
                                                     }
                                                 }
                                             }
@@ -286,6 +298,10 @@ impl AppState {
                     filter_time_ms: last_filter_time,
                     ocr_time_ms: last_ocr_time,
                     tts_time_ms: last_tts_time,
+                    discord_stream_clients: state.discord_stream.get_connected_clients(),
+                    discord_stream_enabled: state.discord_stream.is_enabled(),
+                    discord_stream_mute_local: state.discord_stream.should_mute_local(),
+                    discord_stream_port: state.discord_stream.get_port(),
                 });
 
                 thread::sleep(Duration::from_millis(u64::from(interval)));
