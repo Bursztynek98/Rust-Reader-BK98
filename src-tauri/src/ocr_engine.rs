@@ -4,13 +4,13 @@ use anyhow::{anyhow, Result};
 use image::{imageops, DynamicImage, GrayImage, RgbaImage};
 use oar_ocr::core::config::onnx::{OrtExecutionProvider, OrtSessionConfig};
 use oar_ocr::prelude::*;
-use symspell::{SymSpell, UnicodeiStringStrategy, Verbosity};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+use symspell::{SymSpell, UnicodeiStringStrategy, Verbosity};
 use tauri::{AppHandle, Emitter};
 
 use crate::app_state::WordInfo;
@@ -114,7 +114,11 @@ pub fn ensure_ocr_file_downloaded(
     fs::create_dir_all(&oar_dir)?;
     let target_path = oar_dir.join(filename);
 
-    if target_path.exists() && fs::metadata(&target_path).map(|m| m.len() > 0).unwrap_or(false) {
+    if target_path.exists()
+        && fs::metadata(&target_path)
+            .map(|m| m.len() > 0)
+            .unwrap_or(false)
+    {
         return Ok(());
     }
 
@@ -143,9 +147,16 @@ pub fn ensure_ocr_file_downloaded(
         .timeout(Duration::from_secs(600))
         .build()?;
 
-    let mut response = client.get(&url).send().map_err(|e| anyhow!("HTTP request failed: {:?}", e))?;
+    let mut response = client
+        .get(&url)
+        .send()
+        .map_err(|e| anyhow!("HTTP request failed: {:?}", e))?;
     if !response.status().is_success() {
-        return Err(anyhow!("Failed to download {}: HTTP {}", filename, response.status()));
+        return Err(anyhow!(
+            "Failed to download {}: HTTP {}",
+            filename,
+            response.status()
+        ));
     }
 
     let total_size = response.content_length().unwrap_or(0);
@@ -221,9 +232,21 @@ impl OcrEngine {
         };
 
         let (rec_filename, dict_filename, rec_name) = match rec_id {
-            "medium" => ("pp-ocrv6_medium_rec.onnx", "ppocrv6_dict.txt", "PP-OCRv6 Medium Rec"),
-            "tiny" => ("pp-ocrv6_tiny_rec.onnx", "ppocrv6_tiny_dict.txt", "PP-OCRv6 Tiny Rec"),
-            _ => ("pp-ocrv6_small_rec.onnx", "ppocrv6_dict.txt", "PP-OCRv6 Small Rec"),
+            "medium" => (
+                "pp-ocrv6_medium_rec.onnx",
+                "ppocrv6_dict.txt",
+                "PP-OCRv6 Medium Rec",
+            ),
+            "tiny" => (
+                "pp-ocrv6_tiny_rec.onnx",
+                "ppocrv6_tiny_dict.txt",
+                "PP-OCRv6 Tiny Rec",
+            ),
+            _ => (
+                "pp-ocrv6_small_rec.onnx",
+                "ppocrv6_dict.txt",
+                "PP-OCRv6 Small Rec",
+            ),
         };
 
         ensure_ocr_file_downloaded(det_filename, det_name, app_handle)?;
@@ -254,34 +277,25 @@ impl OcrEngine {
             }));
         }
 
-        let ort_config = OrtSessionConfig::new().with_execution_providers(vec![
-            OrtExecutionProvider::TensorRT {
-                device_id: Some(0),
-                max_workspace_size: None,
-                min_subgraph_size: None,
-                fp16_enable: None,
-                timing_cache: None,
-                timing_cache_path: None,
-                force_timing_cache: None,
-                engine_cache: None,
-                engine_cache_path: None,
-                dump_ep_context_model: None,
-                ep_context_file_path: None,
-            },
-            OrtExecutionProvider::CUDA {
-                device_id: Some(0),
-                gpu_mem_limit: None,
-                arena_extend_strategy: None,
-                cudnn_conv_algo_search: None,
-                cudnn_conv_use_max_workspace: None,
-            },
-            OrtExecutionProvider::CPU,
-        ]);
+        let ort_config = OrtSessionConfig::new()
+            .with_parallel_execution(false)
+            .with_memory_pattern(false)
+            .with_execution_providers(vec![
+                OrtExecutionProvider::DirectML { device_id: Some(0) },
+                OrtExecutionProvider::CPU,
+            ]);
 
         let ocr = OAROCRBuilder::new(det_filename, rec_filename, dict_filename)
             .ort_session(ort_config)
             .build()
-            .map_err(|e| anyhow!("Failed to initialize OCR engine with models ({}, {}): {:?}", det_filename, rec_filename, e))?;
+            .map_err(|e| {
+                anyhow!(
+                    "Failed to initialize OCR engine with models ({}, {}): {:?}",
+                    det_filename,
+                    rec_filename,
+                    e
+                )
+            })?;
 
         if let Some(app) = app_handle {
             let _ = app.emit(
@@ -407,7 +421,11 @@ impl OcrEngine {
 
         let raw_text = raw_parts.join(" ");
         let corrected_text = corrected_parts.join(" ");
-        let avg_conf = if count > 0 { total_conf / count as f32 } else { 0.0 };
+        let avg_conf = if count > 0 {
+            total_conf / count as f32
+        } else {
+            0.0
+        };
 
         Ok(OcrResult {
             raw_text,
@@ -482,7 +500,8 @@ fn add_border_padding_fast(img: &DynamicImage, padding_px: u32) -> DynamicImage 
     for y in 0..orig_h as usize {
         let src_offset = y * row_bytes;
         let dst_offset = (y + padding_px as usize) * new_stride + pad_bytes;
-        new_buf[dst_offset..dst_offset + row_bytes].copy_from_slice(&src_raw[src_offset..src_offset + row_bytes]);
+        new_buf[dst_offset..dst_offset + row_bytes]
+            .copy_from_slice(&src_raw[src_offset..src_offset + row_bytes]);
     }
 
     DynamicImage::ImageRgba8(RgbaImage::from_raw(new_w, new_h, new_buf).unwrap())
@@ -491,14 +510,20 @@ fn add_border_padding_fast(img: &DynamicImage, padding_px: u32) -> DynamicImage 
 /// Linear contrast stretch using a 256-element LookUp Table (< 0.1ms)
 fn stretch_contrast_lut(gray: &GrayImage) -> GrayImage {
     let pixels = gray.as_raw();
-    if pixels.is_empty() { return gray.clone(); }
+    if pixels.is_empty() {
+        return gray.clone();
+    }
 
     let mut min_val = 255u8;
     let mut max_val = 0u8;
 
     for &v in pixels {
-        if v < min_val { min_val = v; }
-        if v > max_val { max_val = v; }
+        if v < min_val {
+            min_val = v;
+        }
+        if v > max_val {
+            max_val = v;
+        }
     }
 
     if max_val <= min_val {
@@ -528,7 +553,9 @@ fn stretch_contrast_lut(gray: &GrayImage) -> GrayImage {
 /// Smooth Unsharp Masking (Soft edge enhancement without noise distortion/ringing halos)
 fn sharpen_fast_smooth(gray: &GrayImage) -> GrayImage {
     let (w, h) = gray.dimensions();
-    if w < 3 || h < 3 { return gray.clone(); }
+    if w < 3 || h < 3 {
+        return gray.clone();
+    }
 
     let src = gray.as_raw();
     let mut dst = src.clone(); // Copy original image so borders stay clean!
@@ -540,9 +567,15 @@ fn sharpen_fast_smooth(gray: &GrayImage) -> GrayImage {
             let center = src[idx] as i32;
 
             // Smooth 3x3 9-point box blur
-            let sum_3x3 = src[idx - w_usize - 1] as i32 + src[idx - w_usize] as i32 + src[idx - w_usize + 1] as i32
-                        + src[idx - 1] as i32 + center + src[idx + 1] as i32
-                        + src[idx + w_usize - 1] as i32 + src[idx + w_usize] as i32 + src[idx + w_usize + 1] as i32;
+            let sum_3x3 = src[idx - w_usize - 1] as i32
+                + src[idx - w_usize] as i32
+                + src[idx - w_usize + 1] as i32
+                + src[idx - 1] as i32
+                + center
+                + src[idx + 1] as i32
+                + src[idx + w_usize - 1] as i32
+                + src[idx + w_usize] as i32
+                + src[idx + w_usize + 1] as i32;
             let blur = sum_3x3 / 9;
 
             // Soft Unsharp Masking: original + 0.6 * (original - blur)
