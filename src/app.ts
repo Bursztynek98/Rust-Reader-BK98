@@ -599,7 +599,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const voices = await invoke<VoiceInfo[]>("get_tts_voices");
       const savedVoice = localStorage.getItem("rust_reader_tts_voice");
-      const currentSelected = selectVoice.value || savedVoice || "piper_jarvis";
+      const currentSelected = savedVoice || (selectVoice ? selectVoice.value : "piper_jarvis");
       if (selectVoice) {
         selectVoice.innerHTML = "";
         voices.forEach((v) => {
@@ -613,6 +613,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
           selectVoice.appendChild(opt);
         });
+        if (savedVoice) {
+          invoke("set_tts_voice", { voiceKey: savedVoice });
+        }
       }
     } catch (e) {
       console.error("Failed to load TTS voices info:", e);
@@ -620,13 +623,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   await refreshVoicesList();
-
-  // If user previously saved a different voice than default, apply it once at startup
-  const savedInitVoice = localStorage.getItem("rust_reader_tts_voice");
-  if (savedInitVoice && savedInitVoice !== "piper_jarvis" && selectVoice) {
-    selectVoice.value = savedInitVoice;
-    invoke("set_tts_voice", { voiceKey: savedInitVoice });
-  }
 
   selectVoice.addEventListener("change", () => {
     localStorage.setItem("rust_reader_tts_voice", selectVoice.value);
@@ -705,21 +701,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           selectOcrRec.appendChild(opt);
         });
       }
+
+      if (savedDet || savedRec) {
+        triggerOcrModelChange();
+      }
     } catch (e) {
       console.error("Failed to load OCR models info:", e);
     }
   }
 
   await refreshOcrModelsList();
-
-  // If user previously saved non-default models, apply them once at startup
-  const savedInitDet = localStorage.getItem("rust_reader_ocr_det");
-  const savedInitRec = localStorage.getItem("rust_reader_ocr_rec");
-  if ((savedInitDet && savedInitDet !== "pp-ocrv6_tiny_det") || (savedInitRec && savedInitRec !== "small")) {
-    if (savedInitDet && selectOcrDet) selectOcrDet.value = savedInitDet;
-    if (savedInitRec && selectOcrRec) selectOcrRec.value = savedInitRec;
-    triggerOcrModelChange();
-  }
 
   function triggerOcrModelChange() {
     if (!selectOcrDet || !selectOcrRec) return;
