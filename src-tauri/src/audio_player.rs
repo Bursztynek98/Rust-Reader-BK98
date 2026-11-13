@@ -66,14 +66,65 @@ fn open_stream_for_device(name: Option<&str>) -> Option<(OutputStream, OutputStr
             let host = cpal::default_host();
             if let Ok(mut devs) = host.output_devices() {
                 if let Some(dev) = devs.find(|d| d.name().map(|n| n == target).unwrap_or(false)) {
-                    if let Ok(stream) = OutputStream::try_from_device(&dev) {
-                        return Some(stream);
+                    match OutputStream::try_from_device(&dev) {
+                        Ok(stream) => {
+                            println!("[AudioPlayer] ✓ Successfully opened output device: {}", target);
+                            return Some(stream);
+                        }
+                        Err(e) => {
+                            eprintln!("[AudioPlayer] ⚠ Failed to open device '{}': {:?}, falling back to default", target, e);
+                        }
                     }
                 }
             }
         }
     }
-    OutputStream::try_default().ok()
+    match OutputStream::try_default() {
+        Ok(stream) => {
+            println!("[AudioPlayer] ✓ Opened default system audio output device");
+            Some(stream)
+        }
+        Err(e) => {
+            eprintln!("[AudioPlayer] ❌ Failed to open default audio output device: {:?}", e);
+            None
+        }
+    }
+}
+
+/// Applies volume scaling with soft-knee limiting saturation for vol > 1.0.
+/// This boosts perceived vocal loudness for values above 100% while smoothly
+/// constraining peak values to prevent hard-clipping and overflow distortion
+/// on both 32-bit float and 16-bit integer output devices (such as virtual cables).
+pub fn apply_volume_and_limiter(samples: &mut [f32], volume: f32) {
+    if (volume - 1.0).abs() < 1e-4 {
+        return;
+    }
+
+    if volume <= 1.0 {
+        for s in samples.iter_mut() {
+            *s *= volume;
+        }
+        return;
+    }
+
+    // Soft-knee limiter:
+    // Linear response below threshold (preserving natural vocal clarity),
+    // smooth tanh saturation above threshold capping safely at ~0.98.
+    let threshold = 0.70f32;
+    let margin = 0.28f32;
+
+    for s in samples.iter_mut() {
+        let amplified = *s * volume;
+        let abs_val = amplified.abs();
+
+        if abs_val <= threshold {
+            *s = amplified;
+        } else {
+            let excess = abs_val - threshold;
+            let compressed = threshold + margin * (excess / margin).tanh();
+            *s = compressed.copysign(amplified);
+        }
+    }
 }
 
 pub struct AudioPlayer {
@@ -107,10 +158,10 @@ impl AudioPlayer {
             let mut pending_queue: Vec<AudioItem> = Vec::new();
             let mut active_text_len: usize = 0;
 
-            let recreate_sink = |stream_pair: &Option<(OutputStream, OutputStreamHandle)>, vol: f32, paused: bool| -> Option<Sink> {
+            let recreate_sink = |stream_pair: &Option<(OutputStream, OutputStreamHandle)>, paused: bool| -> Option<Sink> {
                 if let Some((_, handle)) = stream_pair {
                     if let Ok(new_sink) = Sink::try_new(handle) {
-                        new_sink.set_volume(vol);
+                        new_sink.set_volume(1.0);
                         if paused {
                             new_sink.pause();
                         }
@@ -129,9 +180,6 @@ impl AudioPlayer {
                     PlayerCommand::Enqueue(item) => pending_queue.push(item),
                     PlayerCommand::SetVolume(v) => {
                         *vol_clone.lock() = v;
-                        if let Some(ref s) = sink {
-                            s.set_volume(v);
-                        }
                     }
                     PlayerCommand::SetPaused(p) => {
                         paused_clone.store(p, Ordering::Relaxed);
@@ -152,9 +200,8 @@ impl AudioPlayer {
                         *stream_pair = None;
 
                         *stream_pair = open_stream_for_device(new_dev.as_deref());
-                        let vol = *vol_clone.lock();
                         let paused = paused_clone.load(Ordering::Relaxed);
-                        *sink = recreate_sink(stream_pair, vol, paused);
+                        *sink = recreate_sink(stream_pair, paused);
                         *active_text_len = 0;
                     }
                     PlayerCommand::Skip => {
@@ -162,9 +209,8 @@ impl AudioPlayer {
                         if let Some(ref s) = sink {
                             s.stop();
                         }
-                        let vol = *vol_clone.lock();
                         let paused = paused_clone.load(Ordering::Relaxed);
-                        *sink = recreate_sink(stream_pair, vol, paused);
+                        *sink = recreate_sink(stream_pair, paused);
                         *active_text_len = 0;
                     }
                 }
@@ -216,27 +262,24 @@ impl AudioPlayer {
                         }
                     }
 
-                    // Apply current volume
-                    let vol = *vol_clone.lock();
-                    s.set_volume(vol);
-
                     // Dynamically accelerate audio player (rodio sink) speed linearly when queue builds up
                     let player_speed = calculate_player_speed(current_qlen, total_pending_chars);
                     s.set_speed(player_speed);
 
                     // Play next item if sink has space
                     if s.len() < 2 && !pending_queue.is_empty() {
-                        let next_item = pending_queue.remove(0);
+                        let mut next_item = pending_queue.remove(0);
                         active_text_len = next_item.text_len;
+                        let vol = *vol_clone.lock();
+                        apply_volume_and_limiter(&mut next_item.samples, vol);
                         let source = SamplesBuffer::new(1, next_item.sample_rate, next_item.samples);
                         s.append(source);
                     }
                 } else if stream_pair.is_none() {
                     let cur_dev = dev_clone.lock().clone();
                     stream_pair = open_stream_for_device(cur_dev.as_deref());
-                    let vol = *vol_clone.lock();
                     let paused = paused_clone.load(Ordering::Relaxed);
-                    sink = recreate_sink(&stream_pair, vol, paused);
+                    sink = recreate_sink(&stream_pair, paused);
                 }
 
                 thread::sleep(std::time::Duration::from_millis(15));

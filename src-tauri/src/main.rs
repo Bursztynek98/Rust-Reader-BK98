@@ -126,6 +126,7 @@ fn set_tts_speed(state: State<'_, Arc<AppState>>, speed: f32) -> Result<(), Stri
 fn set_tts_volume(state: State<'_, Arc<AppState>>, volume: f32) -> Result<(), String> {
     let volume = volume.clamp(0.0, 3.0);
     *state.tts_volume.lock() = volume;
+    state.discord_stream.set_volume(volume);
     let player_guard = state.audio_player.lock();
     if let Some(ref player) = *player_guard {
         player.set_volume(volume);

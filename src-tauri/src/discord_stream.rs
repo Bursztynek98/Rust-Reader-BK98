@@ -23,6 +23,7 @@ use tokio::sync::broadcast;
 #[derive(Clone)]
 pub enum StreamEvent {
     Audio(Arc<Vec<u8>>),
+    Volume(f32),
     Skip,
 }
 
@@ -40,6 +41,7 @@ pub struct DiscordStreamManager {
     mute_local: Arc<AtomicBool>,
     connected_clients: Arc<AtomicUsize>,
     port: Arc<AtomicU16>,
+    volume: Arc<parking_lot::Mutex<f32>>,
     event_tx: broadcast::Sender<StreamEvent>,
 }
 
@@ -50,12 +52,14 @@ impl DiscordStreamManager {
         let mute_local = Arc::new(AtomicBool::new(true));
         let connected_clients = Arc::new(AtomicUsize::new(0));
         let port = Arc::new(AtomicU16::new(default_port));
+        let volume = Arc::new(parking_lot::Mutex::new(1.0f32));
 
         let mgr = Self {
             is_enabled: Arc::clone(&is_enabled),
             mute_local: Arc::clone(&mute_local),
             connected_clients: Arc::clone(&connected_clients),
             port: Arc::clone(&port),
+            volume: Arc::clone(&volume),
             event_tx: event_tx.clone(),
         };
 
@@ -63,6 +67,7 @@ impl DiscordStreamManager {
         let is_enabled_cl = Arc::clone(&is_enabled);
         let conn_clients_cl = Arc::clone(&connected_clients);
         let port_cl = Arc::clone(&port);
+        let volume_cl = Arc::clone(&volume);
         let event_tx_cl = event_tx;
 
         std::thread::Builder::new()
@@ -81,7 +86,7 @@ impl DiscordStreamManager {
                 };
 
                 rt.block_on(async move {
-                    if let Err(e) = run_server(port_cl, conn_clients_cl, is_enabled_cl, event_tx_cl).await {
+                    if let Err(e) = run_server(port_cl, conn_clients_cl, is_enabled_cl, volume_cl, event_tx_cl).await {
                         eprintln!("[DiscordStream] Server error: {:?}", e);
                     }
                 });
@@ -97,6 +102,17 @@ impl DiscordStreamManager {
 
     pub fn set_enabled(&self, val: bool) {
         self.is_enabled.store(val, Ordering::Relaxed);
+    }
+
+    #[allow(dead_code)]
+    pub fn get_volume(&self) -> f32 {
+        *self.volume.lock()
+    }
+
+    pub fn set_volume(&self, val: f32) {
+        let val = val.clamp(0.0, 3.0);
+        *self.volume.lock() = val;
+        let _ = self.event_tx.send(StreamEvent::Volume(val));
     }
 
     pub fn should_mute_local(&self) -> bool {
@@ -215,6 +231,7 @@ pub fn samples_to_wav(samples: &[f32], sample_rate: u32) -> Result<Vec<u8>> {
 struct AppStateWs {
     connected_clients: Arc<AtomicUsize>,
     is_enabled: Arc<AtomicBool>,
+    volume: Arc<parking_lot::Mutex<f32>>,
     event_tx: broadcast::Sender<StreamEvent>,
 }
 
@@ -222,6 +239,7 @@ async fn run_server(
     port_holder: Arc<AtomicU16>,
     connected_clients: Arc<AtomicUsize>,
     is_enabled: Arc<AtomicBool>,
+    volume: Arc<parking_lot::Mutex<f32>>,
     event_tx: broadcast::Sender<StreamEvent>,
 ) -> Result<()> {
     let base_port = port_holder.load(Ordering::Relaxed);
@@ -252,6 +270,7 @@ async fn run_server(
     let state = AppStateWs {
         connected_clients,
         is_enabled,
+        volume,
         event_tx,
     };
 
@@ -282,6 +301,14 @@ async fn handle_socket(mut socket: WebSocket, state: AppStateWs) {
         state.connected_clients.load(Ordering::Relaxed)
     );
 
+    // Send initial volume immediately to the newly connected browser tab
+    let initial_vol = *state.volume.lock();
+    let init_json = serde_json::json!({
+        "type": "volume",
+        "volume": initial_vol
+    });
+    let _ = socket.send(Message::Text(init_json.to_string())).await;
+
     let mut rx = state.event_tx.subscribe();
 
     loop {
@@ -293,6 +320,12 @@ async fn handle_socket(mut socket: WebSocket, state: AppStateWs) {
                             if socket.send(Message::Binary((*wav_data).clone())).await.is_err() {
                                 break;
                             }
+                        }
+                    }
+                    Ok(StreamEvent::Volume(vol)) => {
+                        let json = serde_json::json!({ "type": "volume", "volume": vol });
+                        if socket.send(Message::Text(json.to_string())).await.is_err() {
+                            break;
                         }
                     }
                     Ok(StreamEvent::Skip) => {
@@ -400,10 +433,16 @@ const COMPANION_HTML: &str = r#"<!DOCTYPE html>
     <div class="subtitle" id="subtitle">
       Karta odtwarza głos lektora w tle dla streamu na Discordzie.
     </div>
+    <div id="vol-info" style="margin-top: 12px; font-size: 13px; font-weight: 500; color: #9ca3af;">
+      Głośność: 100%
+    </div>
   </div>
 
   <script>
     let audioCtx = null;
+    let gainNode = null;
+    let compressor = null;
+    let currentVolume = 1.0;
     let audioQueue = [];
     let isPlaying = false;
     let currentSource = null;
@@ -413,12 +452,38 @@ const COMPANION_HTML: &str = r#"<!DOCTYPE html>
     const dot = document.getElementById('dot');
     const title = document.getElementById('title');
     const subtitle = document.getElementById('subtitle');
+    const volInfo = document.getElementById('vol-info');
+
+    function updateVolumeDisplay(vol) {
+      if (!volInfo) return;
+      const pct = Math.round(vol * 100);
+      if (pct > 100) {
+        volInfo.textContent = `Głośność: ${pct}% (🔊 Wzmocnienie ${(vol).toFixed(1)}x)`;
+        volInfo.style.color = '#38bdf8';
+      } else {
+        volInfo.textContent = `Głośność: ${pct}%`;
+        volInfo.style.color = '#9ca3af';
+      }
+    }
 
     function initAudio() {
       if (!audioCtx) {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         audioCtx = new AudioContextClass();
         try {
+          gainNode = audioCtx.createGain();
+          gainNode.gain.setValueAtTime(currentVolume, audioCtx.currentTime);
+
+          compressor = audioCtx.createDynamicsCompressor();
+          compressor.threshold.setValueAtTime(-3, audioCtx.currentTime);
+          compressor.knee.setValueAtTime(6, audioCtx.currentTime);
+          compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+          compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+          compressor.release.setValueAtTime(0.15, audioCtx.currentTime);
+
+          gainNode.connect(compressor);
+          compressor.connect(audioCtx.destination);
+
           keepAliveOsc = audioCtx.createOscillator();
           const silentGain = audioCtx.createGain();
           silentGain.gain.value = 0.00001;
@@ -468,6 +533,12 @@ const COMPANION_HTML: &str = r#"<!DOCTYPE html>
                 currentSource = null;
               }
               isPlaying = false;
+            } else if (data.type === 'volume' && typeof data.volume === 'number') {
+              currentVolume = data.volume;
+              if (gainNode && audioCtx) {
+                gainNode.gain.setValueAtTime(currentVolume, audioCtx.currentTime);
+              }
+              updateVolumeDisplay(currentVolume);
             }
           } catch (e) {}
         } else if (event.data instanceof ArrayBuffer) {
@@ -488,7 +559,11 @@ const COMPANION_HTML: &str = r#"<!DOCTYPE html>
       const buf = audioQueue.shift();
       currentSource = audioCtx.createBufferSource();
       currentSource.buffer = buf;
-      currentSource.connect(audioCtx.destination);
+      if (gainNode) {
+        currentSource.connect(gainNode);
+      } else {
+        currentSource.connect(audioCtx.destination);
+      }
       currentSource.onended = () => {
         isPlaying = false;
         currentSource = null;

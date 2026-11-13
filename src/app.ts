@@ -657,8 +657,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     invoke("set_tts_speed", { speed });
   });
 
+  // Load saved volume if present
+  const savedVol = localStorage.getItem("rust_reader_tts_volume");
+  if (savedVol && sliderVolume && valVolume) {
+    const volPct = parseInt(savedVol, 10);
+    if (!isNaN(volPct) && volPct >= 0 && volPct <= 250) {
+      sliderVolume.value = volPct.toString();
+      if (volPct > 100) {
+        valVolume.textContent = `${volPct}% (🔊 Wzmocnienie ${(volPct / 100).toFixed(1)}x)`;
+      } else {
+        valVolume.textContent = `${volPct} %`;
+      }
+      invoke("set_tts_volume", { volume: volPct / 100.0 });
+    }
+  }
+
   sliderVolume.addEventListener("input", () => {
     const volPct = parseInt(sliderVolume.value, 10);
+    localStorage.setItem("rust_reader_tts_volume", volPct.toString());
     if (volPct > 100) {
       valVolume.textContent = `${volPct}% (🔊 Wzmocnienie ${(volPct / 100).toFixed(1)}x)`;
     } else {
