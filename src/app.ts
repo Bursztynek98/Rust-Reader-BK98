@@ -205,8 +205,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   if (chkDiscordEnabled) {
+    const savedEnabled = localStorage.getItem("rust_reader_discord_enabled");
+    if (savedEnabled !== null) {
+      chkDiscordEnabled.checked = savedEnabled === "true";
+      invoke("set_discord_stream_enabled", { enabled: chkDiscordEnabled.checked });
+    }
     chkDiscordEnabled.addEventListener("change", async () => {
       try {
+        localStorage.setItem("rust_reader_discord_enabled", chkDiscordEnabled.checked.toString());
         await invoke("set_discord_stream_enabled", { enabled: chkDiscordEnabled.checked });
       } catch (e) {
         console.error("Failed to set discord stream enabled:", e);
@@ -215,8 +221,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   if (chkDiscordMuteLocal) {
+    const savedMute = localStorage.getItem("rust_reader_discord_mute_local");
+    if (savedMute !== null) {
+      chkDiscordMuteLocal.checked = savedMute === "true";
+      invoke("set_discord_stream_mute_local", { mute: chkDiscordMuteLocal.checked });
+    }
     chkDiscordMuteLocal.addEventListener("change", async () => {
       try {
+        localStorage.setItem("rust_reader_discord_mute_local", chkDiscordMuteLocal.checked.toString());
         await invoke("set_discord_stream_mute_local", { mute: chkDiscordMuteLocal.checked });
       } catch (e) {
         console.error("Failed to set discord stream mute local:", e);
@@ -227,8 +239,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Initial Discord Stream status
   try {
     invoke<DiscordStreamStatus>("get_discord_stream_status").then((status) => {
-      if (chkDiscordEnabled) chkDiscordEnabled.checked = status.is_enabled;
-      if (chkDiscordMuteLocal) chkDiscordMuteLocal.checked = status.mute_local;
+      if (chkDiscordEnabled && localStorage.getItem("rust_reader_discord_enabled") === null) chkDiscordEnabled.checked = status.is_enabled;
+      if (chkDiscordMuteLocal && localStorage.getItem("rust_reader_discord_mute_local") === null) chkDiscordMuteLocal.checked = status.mute_local;
       if (discordStreamPortInfo) discordStreamPortInfo.textContent = `Port: ${status.port}`;
     });
   } catch (e) {}
@@ -253,21 +265,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   if (chkTogglePreview) {
-    chkTogglePreview.addEventListener("change", updatePreviewState);
+    const savedPreview = localStorage.getItem("rust_reader_preview_enabled");
+    if (savedPreview !== null) {
+      chkTogglePreview.checked = savedPreview === "true";
+    }
+    chkTogglePreview.addEventListener("change", () => {
+      localStorage.setItem("rust_reader_preview_enabled", chkTogglePreview.checked.toString());
+      updatePreviewState();
+    });
   }
 
   if (sliderAutocorrectThreshold && valAutocorrectThreshold) {
+    const savedAuto = localStorage.getItem("rust_reader_autocorrect_threshold");
+    if (savedAuto) {
+      sliderAutocorrectThreshold.value = savedAuto;
+      valAutocorrectThreshold.textContent = `${savedAuto} %`;
+      invoke("set_autocorrect_threshold", { thresholdPct: parseInt(savedAuto, 10) });
+    }
     sliderAutocorrectThreshold.addEventListener("input", () => {
       const val = parseInt(sliderAutocorrectThreshold.value, 10);
       valAutocorrectThreshold.textContent = `${val} %`;
+      localStorage.setItem("rust_reader_autocorrect_threshold", val.toString());
       invoke("set_autocorrect_threshold", { thresholdPct: val });
     });
   }
 
   if (sliderWordRejectThreshold && valWordRejectThreshold) {
+    const savedReject = localStorage.getItem("rust_reader_word_reject_threshold");
+    if (savedReject) {
+      sliderWordRejectThreshold.value = savedReject;
+      valWordRejectThreshold.textContent = `${savedReject} %`;
+      invoke("set_word_reject_threshold", { thresholdPct: parseInt(savedReject, 10) });
+    }
     sliderWordRejectThreshold.addEventListener("input", () => {
       const val = parseInt(sliderWordRejectThreshold.value, 10);
       valWordRejectThreshold.textContent = `${val} %`;
+      localStorage.setItem("rust_reader_word_reject_threshold", val.toString());
       invoke("set_word_reject_threshold", { thresholdPct: val });
     });
   }
@@ -288,6 +321,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function refreshTargets() {
     try {
       const targets = await invoke<CaptureTargetInfo[]>("get_targets");
+      const savedTarget = localStorage.getItem("rust_reader_target_id") || "";
+      const currentVal = targetSelect.value || savedTarget;
+
       targetSelect.innerHTML = "";
 
       if (targets.length === 0) {
@@ -305,9 +341,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         targetSelect.appendChild(opt);
       });
 
-      if (targets.length > 0) {
-        await invoke("set_target", { targetId: targets[0].id });
-      }
+      const hasMatch = targets.some((t) => t.id === currentVal);
+      const chosenTargetId = hasMatch ? currentVal : targets[0].id;
+      targetSelect.value = chosenTargetId;
+      await invoke("set_target", { targetId: chosenTargetId });
     } catch (e) {
       console.error("Failed to load targets:", e);
     }
@@ -317,6 +354,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await refreshTargets();
 
   targetSelect.addEventListener("change", async () => {
+    localStorage.setItem("rust_reader_target_id", targetSelect.value);
     await invoke("set_target", { targetId: targetSelect.value });
   });
 
@@ -434,6 +472,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const leftPct = cutLeft / 100.0;
     const widthPct = activeWidthPct / 100.0;
 
+    localStorage.setItem("rust_reader_crop_cut_top", cutTop.toString());
+    localStorage.setItem("rust_reader_crop_cut_bottom", cutBottom.toString());
+    localStorage.setItem("rust_reader_crop_cut_left", cutLeft.toString());
+    localStorage.setItem("rust_reader_crop_cut_right", cutRight.toString());
+
     invoke("set_crop", {
       topPct,
       heightPct,
@@ -463,17 +506,51 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
+  // Load saved crop margins if present
+  const savedCutTop = localStorage.getItem("rust_reader_crop_cut_top");
+  if (savedCutTop !== null && sliderCropCutTop) sliderCropCutTop.value = savedCutTop;
+
+  const savedCutBottom = localStorage.getItem("rust_reader_crop_cut_bottom");
+  if (savedCutBottom !== null && sliderCropCutBottom) sliderCropCutBottom.value = savedCutBottom;
+
+  const savedCutLeft = localStorage.getItem("rust_reader_crop_cut_left");
+  if (savedCutLeft !== null && sliderCropCutLeft) sliderCropCutLeft.value = savedCutLeft;
+
+  const savedCutRight = localStorage.getItem("rust_reader_crop_cut_right");
+  if (savedCutRight !== null && sliderCropCutRight) sliderCropCutRight.value = savedCutRight;
+
   // Initial update of crop Box Model visual state
   updateCropParams();
 
   // 3. Scan Interval & Frame Diff Threshold & OCR Multi-Filter Checkboxes
+  const savedInterval = localStorage.getItem("rust_reader_scan_interval");
+  if (savedInterval && sliderInterval && valInterval) {
+    sliderInterval.value = savedInterval;
+    valInterval.textContent = `${savedInterval} ms`;
+    invoke("set_scan_interval", { intervalMs: parseInt(savedInterval, 10) });
+  }
+
   sliderInterval.addEventListener("input", () => {
     const val = parseInt(sliderInterval.value, 10);
     valInterval.textContent = `${val} ms`;
+    localStorage.setItem("rust_reader_scan_interval", val.toString());
     invoke("set_scan_interval", { intervalMs: val });
   });
 
   if (sliderFrameDiffThreshold) {
+    const savedDiff = localStorage.getItem("rust_reader_frame_diff_threshold");
+    if (savedDiff && valFrameDiffThreshold) {
+      sliderFrameDiffThreshold.value = savedDiff;
+      const dVal = parseInt(savedDiff, 10);
+      let dLabel = `${dVal} bit`;
+      if (dVal === 0) dLabel = "0 (Skanuj każdą)";
+      else if (dVal === 1) dLabel = "1 (Czarny ekran)";
+      else if (dVal === 2) dLabel = "2 (Domyślnie)";
+      else if (dVal >= 5) dLabel = `${dVal} (Niska czułość)`;
+      valFrameDiffThreshold.textContent = dLabel;
+      invoke("set_frame_diff_threshold", { threshold: dVal });
+    }
+
     sliderFrameDiffThreshold.addEventListener("input", () => {
       const val = parseInt(sliderFrameDiffThreshold.value, 10);
       let label = `${val} bit`;
@@ -483,8 +560,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       else if (val >= 5) label = `${val} (Niska czułość)`;
 
       if (valFrameDiffThreshold) valFrameDiffThreshold.textContent = label;
+      localStorage.setItem("rust_reader_frame_diff_threshold", val.toString());
       invoke("set_frame_diff_threshold", { threshold: val });
     });
+  }
+
+  // Load saved OCR filters
+  const savedFiltersJson = localStorage.getItem("rust_reader_ocr_filters");
+  if (savedFiltersJson) {
+    try {
+      const savedFilters = JSON.parse(savedFiltersJson);
+      if (Array.isArray(savedFilters)) {
+        chkOcrFilters.forEach((chk) => {
+          chk.checked = savedFilters.includes(chk.value);
+        });
+        invoke("set_ocr_filters", { filters: savedFilters });
+      }
+    } catch (e) {}
   }
 
   function updateActiveFilters() {
@@ -494,6 +586,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         activeFilters.push(chk.value);
       }
     });
+    localStorage.setItem("rust_reader_ocr_filters", JSON.stringify(activeFilters));
     invoke("set_ocr_filters", { filters: activeFilters });
   }
 
@@ -505,7 +598,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function refreshVoicesList() {
     try {
       const voices = await invoke<VoiceInfo[]>("get_tts_voices");
-      const currentSelected = selectVoice ? selectVoice.value : "piper_jarvis";
+      const savedVoice = localStorage.getItem("rust_reader_tts_voice");
+      const currentSelected = savedVoice || (selectVoice ? selectVoice.value : "piper_jarvis");
       if (selectVoice) {
         selectVoice.innerHTML = "";
         voices.forEach((v) => {
@@ -519,6 +613,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
           selectVoice.appendChild(opt);
         });
+        if (savedVoice) {
+          invoke("set_tts_voice", { voiceKey: savedVoice });
+        }
       }
     } catch (e) {
       console.error("Failed to load TTS voices info:", e);
@@ -528,6 +625,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await refreshVoicesList();
 
   selectVoice.addEventListener("change", () => {
+    localStorage.setItem("rust_reader_tts_voice", selectVoice.value);
     invoke("set_tts_voice", { voiceKey: selectVoice.value });
   });
 
@@ -573,9 +671,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const detModels = await invoke<OcrModelInfo[]>("get_ocr_detection_models");
       const recModels = await invoke<OcrModelInfo[]>("get_ocr_recognition_models");
+      const savedDet = localStorage.getItem("rust_reader_ocr_det");
+      const savedRec = localStorage.getItem("rust_reader_ocr_rec");
 
       if (selectOcrDet) {
-        const curDet = selectOcrDet.value || "pp-ocrv6_tiny_det";
+        const curDet = savedDet || selectOcrDet.value || "pp-ocrv6_tiny_det";
         selectOcrDet.innerHTML = "";
         detModels.forEach((m) => {
           const opt = document.createElement("option");
@@ -589,7 +689,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       if (selectOcrRec) {
-        const curRec = selectOcrRec.value || "small";
+        const curRec = savedRec || selectOcrRec.value || "small";
         selectOcrRec.innerHTML = "";
         recModels.forEach((m) => {
           const opt = document.createElement("option");
@@ -601,6 +701,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           selectOcrRec.appendChild(opt);
         });
       }
+
+      if (savedDet || savedRec) {
+        triggerOcrModelChange();
+      }
     } catch (e) {
       console.error("Failed to load OCR models info:", e);
     }
@@ -610,6 +714,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function triggerOcrModelChange() {
     if (!selectOcrDet || !selectOcrRec) return;
+    localStorage.setItem("rust_reader_ocr_det", selectOcrDet.value);
+    localStorage.setItem("rust_reader_ocr_rec", selectOcrRec.value);
     invoke("set_ocr_models", {
       detId: selectOcrDet.value,
       recId: selectOcrRec.value,
@@ -651,9 +757,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  // Load saved TTS speed
+  const savedSpeed = localStorage.getItem("rust_reader_tts_speed");
+  if (savedSpeed && sliderSpeed && valSpeed) {
+    const fSpeed = parseFloat(savedSpeed);
+    if (!isNaN(fSpeed)) {
+      sliderSpeed.value = savedSpeed;
+      valSpeed.textContent = `${fSpeed.toFixed(1)} x`;
+      invoke("set_tts_speed", { speed: fSpeed });
+    }
+  }
+
   sliderSpeed.addEventListener("input", () => {
     const speed = parseFloat(sliderSpeed.value);
     valSpeed.textContent = `${speed.toFixed(1)} x`;
+    localStorage.setItem("rust_reader_tts_speed", speed.toString());
     invoke("set_tts_speed", { speed });
   });
 
